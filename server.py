@@ -161,17 +161,12 @@ async def router(websocket, path):
         await twilio_handler(websocket)
 
 def main():
-    # use this if using ssl
-    # ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    # ssl_context.load_cert_chain('cert.pem', 'key.pem')
-    # server = websockets.serve(router, '0.0.0.0', 443, ssl=ssl_context)
-
-    # use this if not using ssl
-    server = websockets.serve(router, "localhost", 5000)
-    print("Server starting on ws://localhost:5000")
-
-    asyncio.get_event_loop().run_until_complete(server)
-    asyncio.get_event_loop().run_forever()
+    port = int(os.environ.get("PORT", 5000))  # Render provides PORT
+    server = websockets.serve(router, "0.0.0.0", port)
+    print(f"Server starting on ws://0.0.0.0:{port}")
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(server)
+    loop.run_forever()
 
 
 if __name__ == "__main__":
