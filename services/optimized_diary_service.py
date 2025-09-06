@@ -9,6 +9,7 @@ from typing import List, Dict, Any, Optional
 import json
 import time
 from functools import lru_cache
+from collections import defaultdict
 
 class OptimizedDiaryService:
     def __init__(self, service_account_path: str = None, password: str = "123456"):
@@ -120,7 +121,7 @@ class OptimizedDiaryService:
             max_entries: Maximum number of entries to return (default 50)
             
         Returns:
-            List of formatted diary entries (most recent first, limited)
+            List of formatted diary entries (most recent day first, then by time within each day)
         """
         cache_key = self._get_cache_key(user_id, days)
         
@@ -232,22 +233,36 @@ class OptimizedDiaryService:
             if len(entries) >= max_entries:
                 break
         
-        # Sort entries by date and time (most recent first)
-        entries.sort(key=lambda x: (x['date'], x['time']), reverse=True)
+        # Group entries by date and sort by date (most recent first)
+        entries_by_date = defaultdict(list)
+        for entry in entries:
+            entries_by_date[entry['date']].append(entry)
+        
+        # Sort dates in descending order (most recent first)
+        sorted_dates = sorted(entries_by_date.keys(), reverse=True)
+        
+        # Sort entries within each date by time (most recent first)
+        sorted_entries = []
+        for date in sorted_dates:
+            day_entries = entries_by_date[date]
+            # Sort by time within the day (most recent first)
+            day_entries.sort(key=lambda x: x['time'], reverse=True)
+            sorted_entries.extend(day_entries)
         
         # Apply final limit
-        entries = entries[:max_entries]
+        sorted_entries = sorted_entries[:max_entries]
         
-        print(f"📊 Total entries collected: {len(entries)}")
-        if entries:
-            print(f"📅 Date range: {entries[-1]['date']} to {entries[0]['date']}")
-            print(f"📊 Showing most recent {len(entries)} entries")
+        print(f"📊 Total entries collected: {len(sorted_entries)}")
+        if sorted_entries:
+            print(f"📅 Date range: {sorted_entries[-1]['date']} to {sorted_entries[0]['date']}")
+            print(f"📊 Showing most recent {len(sorted_entries)} entries")
+            print(f"📅 Days covered: {len(set(entry['date'] for entry in sorted_entries))}")
         
         # Update cache
-        self.cache[cache_key] = entries
+        self.cache[cache_key] = sorted_entries
         self.last_fetch_time = time.time()
         
-        return entries
+        return sorted_entries
     
     def _calculate_duration(self, time_str: str, lasttime_str: str) -> str:
         """
@@ -313,7 +328,7 @@ class OptimizedDiaryService:
     
     def format_entries_for_prompt(self, entries: List[Dict[str, Any]], max_chars: int = 8000) -> str:
         """
-        Format entries for the agent prompt with character limit
+        Format entries for the agent prompt with character limit and day grouping
         
         Args:
             entries: List of diary entries
@@ -327,10 +342,21 @@ class OptimizedDiaryService:
         
         formatted_entries = []
         current_chars = 0
+        current_date = None
         
         for entry in entries:
+            # Add day header if date changed
+            if current_date != entry['date']:
+                if current_date is not None:
+                    formatted_entries.append("")  # Empty line between days
+                
+                current_date = entry['date']
+                day_header = f"📅 **{current_date}**"
+                formatted_entries.append(day_header)
+                current_chars += len(day_header) + 1  # +1 for newline
+            
             # Format the entry
-            formatted_entry = f"📅 {entry['date']} at {entry['time']} ({entry['duration']})"
+            formatted_entry = f"  ⏰ {entry['time']} ({entry['duration']})"
             
             if entry['action']:
                 formatted_entry += f" - {entry['action']}"
@@ -340,7 +366,7 @@ class OptimizedDiaryService:
                 description = entry['description']
                 if len(description) > 200:
                     description = description[:200] + "..."
-                formatted_entry += f"\n{description}"
+                formatted_entry += f"\n    {description}"
             
             # Check if adding this entry would exceed the character limit
             entry_chars = len(formatted_entry) + 2  # +2 for newlines
@@ -372,7 +398,7 @@ class OptimizedDiaryService:
         if formatted_entries == "No diary entries found for the last 7 days.":
             return formatted_entries
         
-        return f"Here are Alessandro's diary entries from the last {days} days (most recent first, {len(entries)} entries):\n\n{formatted_entries}"
+        return f"Here are Alessandro's diary entries from the last {days} days (most recent day first):\n\n{formatted_entries}"
     
     def clear_cache(self):
         """
