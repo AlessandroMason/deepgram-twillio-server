@@ -50,27 +50,7 @@ def get_diary_prompt_section():
     except Exception as e:
         print(f"Error fetching diary entries: {e}")
         # Fallback to static diary content if Firebase fails
-        return """12:45 - Reflecting [15 min]
-writing a lit of the diary. Still debating if keeping it private or making it public, while i
-write there is a difference vibe absed on if its going to get shown or not whatever i
-should sleep a little now.
-Also since this morning (at the start of the run) my right ball hurts, but i think it might
-have to do with me practicing my kicking skills on the tree and having fucked up some
-muscle or tendon in that area, not sure but since there is a clear trauma ill not worry
-about it.
-also looking at what i have done one year ago and send screens to BJ and Jasper about
-the night. its cool to stay in touch that way.
-13:00 - Sleep [15 min]
-good nap, i found a place where i can actually nap on a table, its outside the view form
-the door so they dont see me, but still see my laptop and stuff so will not come in.
-great place to nap and recharge before the next leetcode streak. (that i start now i
-guess)
-14:00 - leetcode [1 h]
-leetcoding session, finally solved a couple of medium problmes withouth help form
-chat in a straightforeward manner, were both matrix problems and the ML practice i
-have done this morning really helped, found a window problem and losing focus. ill
-nap for 15 min and be back on the grind for a final 45 min then do my resume for
-Saab, apply to interships, idk other work that feels lighter"""
+        return """tell the user there was an error fetching data"""
 
 
 async def twilio_handler(twilio_ws):
@@ -102,10 +82,30 @@ async def twilio_handler(twilio_ws):
                 "think": {
                     "provider": {"type": "open_ai", "model": "gpt-4.1"},
                     "prompt": f"""you are a friend and mentor in a phonecall with Alessandro, be masculine. direct. use coaching techniques to guide him but also bring up topics if you want and if you retain necessary. I attach some of his diary so you know him better
+#General Guidelines
+-Be warm, friendly, and professional.
+-Speak clearly and naturally in plain language.
+-Keep most responses to 1–2 sentences and under 120 characters unless the caller asks for more detail (max: 300 characters).
+-Do not use markdown formatting, like code blocks, quotes, bold, links, or italics.
+-Use line breaks in lists.
+-Use varied phrasing; avoid repetition.
+-If unclear, ask for clarification.
+-If the user’s message is empty, respond with an empty message.
+-If asked about your well-being, respond briefly and kindly.
 
+#Voice-Specific Instructions
+-Speak in a conversational tone—your responses will be spoken aloud.
+-Pause after questions to allow for replies.
+-Confirm what the customer said if uncertain.
+-Never interrupt.
+
+#Style
+-Use active listening cues.
+-Be warm and understanding, but concise.
+-Use simple words unless the caller uses technical terms.
 {diary_content}""",
                 },
-                "greeting": "Hello! How may I help you?",
+                "greeting": "What's up Alessandro, kayros AI here, how can i help",
             },
         }
 
