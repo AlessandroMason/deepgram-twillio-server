@@ -33,7 +33,7 @@ def sts_connect():
 
 def get_diary_prompt_section():
     """
-    Get diary entries from Firebase and format them for the prompt
+    Get diary entries from Firebase and format them for the prompt with limits
     """
     try:
         # User ID from the path provided
@@ -42,8 +42,14 @@ def get_diary_prompt_section():
         # Get the optimized service
         service = get_diary_service()
         
-        # Get formatted diary entries (with caching and decryption)
-        diary_section = service.get_diary_prompt_section(user_id, days=7)
+        # Get formatted diary entries with limits to prevent prompt from being too long
+        # Limit to 30 entries and 6000 characters to keep prompt manageable
+        diary_section = service.get_diary_prompt_section(
+            user_id, 
+            days=7, 
+            max_entries=30, 
+            max_chars=6000
+        )
         
         return diary_section
         
@@ -100,9 +106,30 @@ async def twilio_handler(twilio_ws):
                 "listen": {"provider": {"type": "deepgram", "model": "nova-3"}},
                 "think": {
                     "provider": {"type": "open_ai", "model": "gpt-4.1"},
-                    "prompt": """you are a friend and mentor in a phonecall with Alessandro, be masculine. direct. use coaching techniques to guide him but also bring up topics if you want and if you retain necessary. I will provide you with his diary entries shortly.""",
+                    "prompt": """you are a friend and mentor in a phonecall with Alessandro, be masculine. direct. use coaching techniques to guide him but also bring up topics if you want and if you retain necessary. I will provide you with his diary entries shortly.
+                    #General Guidelines
+-Be warm, friendly, and professional.
+-Speak clearly and naturally in plain language.
+-Keep most responses to 1–2 sentences and under 120 characters unless the caller asks for more detail (max: 300 characters).
+-Do not use markdown formatting, like code blocks, quotes, bold, links, or italics.
+-Use line breaks in lists.
+-Use varied phrasing; avoid repetition.
+-If unclear, ask for clarification.
+-If the user’s message is empty, respond with an empty message.
+-If asked about your well-being, respond briefly and kindly.
+
+#Voice-Specific Instructions
+-Speak in a conversational tone—your responses will be spoken aloud.
+-Pause after questions to allow for replies.
+-Confirm what the customer said if uncertain.
+-Never interrupt.
+
+#Style
+-Use active listening cues.
+-Be warm and understanding, but concise.
+-Use simple words unless the caller uses technical terms.""",
                 },
-                "greeting": "Hello! How may I help you?",
+                "greeting": "Hi Ale! Kayros Ai here.",
             },
         }
 
@@ -189,16 +216,18 @@ async def twilio_handler(twilio_ws):
 
         async def load_and_update_prompt(sts_ws):
             """
-            Load diary data and update prompt in background
+            Load diary data and update prompt in background with limits
             """
             try:
-                print("🔄 Loading diary data...")
+                print("🔄 Loading diary data with limits...")
                 diary_content = get_diary_prompt_section()
                 
                 # Create the updated prompt
                 updated_prompt = f"""you are a friend and mentor in a phonecall with Alessandro, be masculine. direct. use coaching techniques to guide him but also bring up topics if you want and if you retain necessary. I attach some of his diary so you know him better
 
 {diary_content}"""
+                
+                print(f"📊 Prompt length: {len(updated_prompt)} characters")
                 
                 # Send UpdatePrompt message
                 update_message = {
@@ -242,6 +271,7 @@ def main():
     print(f"Server starting on ws://0.0.0.0:{port}")
     print("Using optimized diary service with caching and decryption")
     print("Diary data will be loaded in background and injected via UpdatePrompt")
+    print("Limits: 30 entries max, 6000 characters max")
     loop = asyncio.get_event_loop()
     loop.run_until_complete(server)
     loop.run_forever()

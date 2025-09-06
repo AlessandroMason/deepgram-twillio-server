@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test runner script for the diary service
+Test runner script for all services
 """
 
 import os
@@ -33,7 +33,7 @@ def run_test(test_file):
 
 def main():
     """Run all tests"""
-    print("🧪 Running Diary Service Tests")
+    print("🧪 Running All Service Tests")
     print("=" * 60)
     
     # Check if we're in the right directory
@@ -43,7 +43,8 @@ def main():
     
     # List of tests to run
     tests = [
-        "tests/test_diary_service.py"
+        "tests/test_diary_service.py",
+        "tests/test_email_service.py"
     ]
     
     results = []
