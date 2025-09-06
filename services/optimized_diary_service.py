@@ -161,14 +161,16 @@ class OptimizedDiaryService:
         
         # Check cache first
         if cache_key in self.cache and self._is_cache_valid():
-            print(f"Using cached data for {user_id}")
+            print(f"🔄 Using cached data for {user_id}")
             return self.cache[cache_key]
         
-        print(f"Fetching fresh data for {user_id} (last {days} days)")
+        print(f"🔄 Fetching fresh data for {user_id} (last {days} days)")
         
         # Calculate date range
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days)
+        
+        print(f"📅 Date range: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
         
         entries = []
         
@@ -178,6 +180,8 @@ class OptimizedDiaryService:
         # Use batch processing for better performance
         batch_size = 50
         date_docs = list(date_ref.stream())
+        
+        print(f"📊 Total date documents found: {len(date_docs)}")
         
         for i in range(0, len(date_docs), batch_size):
             batch_docs = date_docs[i:i + batch_size]
@@ -192,13 +196,17 @@ class OptimizedDiaryService:
                     else:
                         doc_date = datetime.strptime(date_str, "%Y-%m-%d")
                     
+                    print(f"📅 Processing date: {date_str} -> {doc_date.strftime('%Y-%m-%d')}")
+                    
                     # Check if date is within our range
                     if start_date.date() <= doc_date.date() <= end_date.date():
-                        print(f"Processing date: {date_str}")
+                        print(f"✅ Date {date_str} is within range")
                         
                         # Get all SpecificTimes for this date
                         specific_times_ref = date_ref.document(date_str).collection('SpecificTimes')
                         specific_times = list(specific_times_ref.stream())
+                        
+                        print(f"📊 Found {len(specific_times)} specific times for {date_str}")
                         
                         for time_doc in specific_times:
                             time_data = time_doc.to_dict()
@@ -210,12 +218,17 @@ class OptimizedDiaryService:
                             action = self._convert_firestore_value(time_data.get('action', ''))
                             description = self._convert_firestore_value(time_data.get('description', ''))
                             
+                            print(f"  ⏰ Time: {time_str}")
+                            print(f"  ⏰ LastTime: {lasttime_str}")
+                            print(f"  🎯 Action: {action}")
+                            
                             # Decrypt description if it's encrypted
                             if description and not description.startswith('[') and len(description) > 10:
                                 try:
                                     decrypted_desc = self.deterministic_decryption(description)
                                     if not decrypted_desc.startswith('['):  # Only use if decryption succeeded
                                         description = decrypted_desc
+                                        print(f"  🔓 Decrypted description: {description[:50]}...")
                                 except:
                                     pass  # Keep original if decryption fails
                             
@@ -233,14 +246,20 @@ class OptimizedDiaryService:
                             duration = self._calculate_duration(entry['time'], entry['lasttime'])
                             entry['duration'] = duration
                             
-                            entries.append(entry)
+                            print(f"  ⏱️  Duration: {duration}")
                             
+                            entries.append(entry)
+                    else:
+                        print(f"⏭️  Skipping date outside range: {date_str}")
+                        
                 except ValueError as e:
-                    print(f"Skipping document with invalid date format: {date_str} - {e}")
+                    print(f"❌ Skipping document with invalid date format: {date_str} - {e}")
                     continue
         
         # Sort entries by date and time
         entries.sort(key=lambda x: (x['date'], x['time']))
+        
+        print(f"📊 Total entries collected: {len(entries)}")
         
         # Update cache
         self.cache[cache_key] = entries
@@ -261,7 +280,7 @@ class OptimizedDiaryService:
             lasttime_dt = self._parse_time_string(lasttime_str)
             
             if not time_dt or not lasttime_dt:
-                print(f"Could not parse time strings: '{time_str}' or '{lasttime_str}'")
+                print(f"❌ Could not parse time strings: '{time_str}' or '{lasttime_str}'")
                 return "Unknown duration"
             
             # Calculate difference
@@ -269,7 +288,7 @@ class OptimizedDiaryService:
             
             # Handle negative durations (lasttime before time)
             if duration.total_seconds() < 0:
-                print(f"Negative duration detected: {time_str} -> {lasttime_str}")
+                print(f"⚠️  Negative duration detected: {time_str} -> {lasttime_str}")
                 return "Invalid duration"
             
             # Convert to minutes
@@ -286,7 +305,7 @@ class OptimizedDiaryService:
                     return f"{hours} h {minutes} min"
                     
         except Exception as e:
-            print(f"Error calculating duration: {e}")
+            print(f"❌ Error calculating duration: {e}")
             print(f"  Time: '{time_str}'")
             print(f"  LastTime: '{lasttime_str}'")
             return "Unknown duration"
