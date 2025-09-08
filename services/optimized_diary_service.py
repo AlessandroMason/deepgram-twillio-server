@@ -111,14 +111,14 @@ class OptimizedDiaryService:
         # Handle other types
         return str(value)
     
-    def get_diary_entries_optimized(self, user_id: str, days: int = 7, max_entries: int = 50) -> List[Dict[str, Any]]:
+    def get_diary_entries_optimized(self, user_id: str, days: int = 4, max_entries: int = 100) -> List[Dict[str, Any]]:
         """
         Optimized method to fetch diary entries with caching and limits
         
         Args:
             user_id: The user ID in Firebase
-            days: Number of days to fetch (default 7)
-            max_entries: Maximum number of entries to return (default 50)
+            days: Number of days to fetch (default 4)
+            max_entries: Maximum number of entries to return (default 100)
             
         Returns:
             List of formatted diary entries (most recent day first, then by time within each day)
@@ -129,10 +129,9 @@ class OptimizedDiaryService:
         if cache_key in self.cache and self._is_cache_valid():
             print(f"🔄 Using cached data for {user_id}")
             cached_entries = self.cache[cache_key]
-            # Apply limit to cached data too
             return cached_entries[:max_entries]
         
-        print(f"🔄 Fetching fresh data for {user_id} (last {days} days, max {max_entries} entries)")
+        print(f"🔄 Fetching fresh data for {user_id} (last {days} days)")
         
         # Calculate date range
         end_date = datetime.now()
@@ -217,23 +216,14 @@ class OptimizedDiaryService:
                             print(f"  ⏱️  Duration: {duration}")
                             
                             entries.append(entry)
-                            
-                            # Early exit if we have enough entries
-                            if len(entries) >= max_entries:
-                                print(f"🛑 Reached maximum entries limit ({max_entries})")
-                                break
                     else:
                         print(f"⏭️  Skipping date outside range: {date_str}")
                         
                 except ValueError as e:
                     print(f"❌ Skipping document with invalid date format: {date_str} - {e}")
                     continue
-            
-            # Early exit if we have enough entries
-            if len(entries) >= max_entries:
-                break
         
-        # Group entries by date and sort by date (most recent first)
+        # Group entries by date
         entries_by_date = defaultdict(list)
         for entry in entries:
             entries_by_date[entry['date']].append(entry)
@@ -338,7 +328,7 @@ class OptimizedDiaryService:
             Formatted string for the agent prompt
         """
         if not entries:
-            return "No diary entries found for the last 7 days."
+            return "No diary entries found for the last 4 days."
         
         formatted_entries = []
         current_chars = 0
@@ -382,20 +372,20 @@ class OptimizedDiaryService:
         
         return result
     
-    def get_diary_prompt_section(self, user_id: str, days: int = 7, max_entries: int = 50, max_chars: int = 8000) -> str:
+    def get_diary_prompt_section(self, user_id: str, days: int = 4, max_entries: int = 100, max_chars: int = 8000) -> str:
         """
         Get formatted diary entries ready for the agent prompt with limits
         
         Args:
             user_id: The user ID in Firebase
-            days: Number of days to fetch (default 7)
-            max_entries: Maximum number of entries to return (default 50)
+            days: Number of days to fetch (default 4)
+            max_entries: Maximum number of entries to return (default 100)
             max_chars: Maximum characters for the formatted string (default 8000)
         """
         entries = self.get_diary_entries_optimized(user_id, days, max_entries)
         formatted_entries = self.format_entries_for_prompt(entries, max_chars)
         
-        if formatted_entries == "No diary entries found for the last 7 days.":
+        if formatted_entries == "No diary entries found for the last 4 days.":
             return formatted_entries
         
         return f"Here are Alessandro's diary entries from the last {days} days (most recent day first):\n\n{formatted_entries}"
@@ -419,7 +409,7 @@ def main():
         service = OptimizedDiaryService()
         
         # Get formatted diary entries with limits
-        prompt_section = service.get_diary_prompt_section(user_id, days=7, max_entries=30, max_chars=6000)
+        prompt_section = service.get_diary_prompt_section(user_id, days=4, max_entries=100, max_chars=8000)
         
         print("=== DIARY ENTRIES FOR AGENT PROMPT ===")
         print(prompt_section)
@@ -429,11 +419,11 @@ def main():
         # Test caching
         print("\n=== TESTING CACHE ===")
         start_time = time.time()
-        entries = service.get_diary_entries_optimized(user_id, days=7, max_entries=30)
+        entries = service.get_diary_entries_optimized(user_id, days=4, max_entries=100)
         first_fetch_time = time.time() - start_time
         
         start_time = time.time()
-        entries = service.get_diary_entries_optimized(user_id, days=7, max_entries=30)
+        entries = service.get_diary_entries_optimized(user_id, days=4, max_entries=100)
         second_fetch_time = time.time() - start_time
         
         print(f"First fetch: {first_fetch_time:.2f}s")
