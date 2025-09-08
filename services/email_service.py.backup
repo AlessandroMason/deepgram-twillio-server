@@ -6,57 +6,27 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Dict, Any, Optional
 import re
-from constants import CONTACTS, EMAIL_SERVICE_CONFIG
 
 class EmailService:
-    def __init__(self, openai_api_key: str = None, gmail_email: str = None, gmail_password: str = None):
+    def __init__(self, openai_api_key: str = None, gmail_email: str = "axm2022@case.edu", gmail_password: str = "iwtn sges urbz tkuo"):
         """
         Initialize email service with OpenAI and Gmail SMTP integration
         
         Args:
-            openai_api_key: OpenAI API key (defaults to env var)
-            gmail_email: Gmail email address (defaults to env var or config)
-            gmail_password: Gmail app password (defaults to env var)
+            openai_api_key: OpenAI API key
+            gmail_email: Gmail email address
+            gmail_password: Gmail app password
         """
-        # Get OpenAI API key
         if openai_api_key is None:
             openai_api_key = os.getenv("OPENAI_API_KEY")
         
         if not openai_api_key:
             raise ValueError("OpenAI API key not provided. Set OPENAI_API_KEY environment variable or pass openai_api_key parameter.")
         
-        # Get Gmail credentials
-        self.gmail_email = gmail_email or os.getenv("GMAIL_EMAIL") or EMAIL_SERVICE_CONFIG["gmail_email"]
-        self.gmail_password = gmail_password or os.getenv("GMAIL_PASSWORD")
-        
-        if not self.gmail_password:
-            raise ValueError("Gmail password not provided. Set GMAIL_PASSWORD environment variable or pass gmail_password parameter.")
-        
         self.openai_client = openai.OpenAI(api_key=openai_api_key)
+        self.gmail_email = gmail_email
+        self.gmail_password = gmail_password
         
-    def find_contact_email(self, name: str) -> Optional[str]:
-        """
-        Find email address for a contact by name
-        
-        Args:
-            name: Contact name to search for
-            
-        Returns:
-            Email address if found, None otherwise
-        """
-        name_lower = name.lower().strip()
-        
-        # Direct lookup
-        if name_lower in CONTACTS:
-            return CONTACTS[name_lower]
-        
-        # Partial match
-        for contact_name, email in CONTACTS.items():
-            if name_lower in contact_name or contact_name in name_lower:
-                return email
-        
-        return None
-    
     def generate_email_content(self, recipient: str, description: str, context: str = "") -> Dict[str, str]:
         """
         Generate email content using OpenAI
@@ -189,12 +159,12 @@ Return the response in JSON format:
         """
         try:
             # Create drafts directory if it doesn't exist
-            os.makedirs('services/drafts', exist_ok=True)
+            os.makedirs('drafts', exist_ok=True)
             
             # Create filename with timestamp
             from datetime import datetime
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"services/drafts/email_{timestamp}_{to_email.replace('@', '_at_')}.txt"
+            filename = f"drafts/email_{timestamp}_{to_email.replace('@', '_at_')}.txt"
             
             # Write draft to file
             with open(filename, 'w') as f:
@@ -232,7 +202,7 @@ Return the response in JSON format:
                 return {
                     "success": False,
                     "error": "Could not extract recipient email address",
-                    "message": "Please provide a valid email address or contact name"
+                    "message": "Please provide a valid email address"
                 }
             
             # Generate email content
@@ -293,27 +263,9 @@ Return the response in JSON format:
         # Email regex pattern
         email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
         
-        # Find email addresses first
+        # Find email addresses
         emails = re.findall(email_pattern, message)
         recipient = emails[0] if emails else None
-        
-        # If no email found, try to find contact name
-        if not recipient:
-            # Look for common patterns like "send email to [name]"
-            name_patterns = [
-                r'send.*email.*to\s+(\w+)',
-                r'email.*to\s+(\w+)',
-                r'send.*to\s+(\w+)',
-                r'email\s+(\w+)'
-            ]
-            
-            for pattern in name_patterns:
-                match = re.search(pattern, message, re.IGNORECASE)
-                if match:
-                    name = match.group(1)
-                    recipient = self.find_contact_email(name)
-                    if recipient:
-                        break
         
         # Extract description (remove email and common phrases)
         description = message
@@ -327,9 +279,7 @@ Return the response in JSON format:
             "send email",
             "write an email",
             "compose an email",
-            "draft an email",
-            "send to",
-            "email"
+            "draft an email"
         ]
         
         for phrase in phrases_to_remove:
@@ -347,11 +297,11 @@ def main():
         # Initialize the service
         service = EmailService()
         
-        # Test email generation with contact name
-        test_message = "send an email to alessandro regarding the project update and meeting schedule"
+        # Test email generation
+        test_message = "send an email to john.doe@example.com with all the details about the project update"
         context = "User has been working on a machine learning project and wants to update stakeholders"
         
-        print("🧪 Testing Email Service with Contact List")
+        print("🧪 Testing Email Service")
         print("=" * 50)
         
         # Test saving as draft
@@ -368,7 +318,7 @@ def main():
         
     except Exception as e:
         print(f"❌ Error: {e}")
-        print("Make sure to set the OPENAI_API_KEY and GMAIL_PASSWORD environment variables")
+        print("Make sure to set the OPENAI_API_KEY environment variable")
 
 if __name__ == "__main__":
     main()

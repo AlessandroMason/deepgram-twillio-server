@@ -6,10 +6,8 @@ import websockets
 import ssl
 import os
 from services.optimized_diary_service import OptimizedDiaryService
-from services.agent_response_parser import AgentResponseParser
-from services.email_service import EmailService
 from constants import (
-    UPDATED_INITIAL_PROMPT, 
+    INITIAL_PROMPT, 
     GREETING, 
     USER_ID, 
     DIARY_DAYS, 
@@ -18,10 +16,8 @@ from constants import (
     FALLBACK_DIARY
 )
 
-# Global service instances for caching across requests
+# Global service instance for caching across requests
 diary_service = None
-email_service = None
-response_parser = None
 
 def get_diary_service():
     """
@@ -31,24 +27,6 @@ def get_diary_service():
     if diary_service is None:
         diary_service = OptimizedDiaryService()
     return diary_service
-
-def get_email_service():
-    """
-    Get or create the global email service instance
-    """
-    global email_service
-    if email_service is None:
-        email_service = EmailService()
-    return email_service
-
-def get_response_parser():
-    """
-    Get or create the global response parser instance
-    """
-    global response_parser
-    if response_parser is None:
-        response_parser = AgentResponseParser(get_email_service())
-    return response_parser
 
 def sts_connect():
     # you can run export DEEPGRAM_API_KEY="your key" in your terminal to set your API key.
@@ -70,38 +48,66 @@ def get_complete_prompt():
         # Get the optimized service
         service = get_diary_service()
         
-        # Get diary data
-        diary_data = service.get_diary_data(USER_ID, DIARY_DAYS, DIARY_MAX_ENTRIES, DIARY_MAX_CHARS)
+        # Get formatted diary entries with limits
+        diary_section = service.get_diary_prompt_section(
+            USER_ID, 
+            days=DIARY_DAYS, 
+            max_entries=DIARY_MAX_ENTRIES, 
+            max_chars=DIARY_MAX_CHARS
+        )
         
-        if diary_data and diary_data.strip():
-            complete_prompt = f"{UPDATED_INITIAL_PROMPT}\n\n#Diary Data:\n{diary_data}"
-        else:
-            complete_prompt = f"{UPDATED_INITIAL_PROMPT}\n\n#Diary Data:\n{FALLBACK_DIARY}"
+        # Combine initial prompt with diary data
+        complete_prompt = f"""{INITIAL_PROMPT}
+
+{diary_section}"""
         
         return complete_prompt
         
     except Exception as e:
-        print(f"❌ Error getting diary data: {e}")
-        return f"{UPDATED_INITIAL_PROMPT}\n\n#Diary Data:\n{FALLBACK_DIARY}"
+        print(f"Error fetching diary entries: {e}")
+        # Fallback to static diary content if Firebase fails
+        return f"""{INITIAL_PROMPT}
+
+{FALLBACK_DIARY}"""
 
 
 async def twilio_handler(twilio_ws):
-    print("twilio_handler started")
-    sts_ws = await sts_connect()
     audio_queue = asyncio.Queue()
     streamsid_queue = asyncio.Queue()
 
-    async with sts_ws as sts_ws:
+    async with sts_connect() as sts_ws:
+        # Get complete prompt with diary data immediately
         complete_prompt = get_complete_prompt()
         
+        # Configuration with complete prompt from the start
         config_message = {
-            "type": "ConversationText",
-            "role": "assistant",
-            "content": complete_prompt,
+            "type": "Settings",
+            "audio": {
+                "input": {
+                    "encoding": "mulaw",
+                    "sample_rate": 8000,
+                },
+                "output": {
+                    "encoding": "mulaw",
+                    "sample_rate": 8000,
+                    "container": "none",
+                },
+            },
+            "agent": {
+                "speak": {
+                    "provider": {"type": "deepgram", "model": "aura-2-odysseus-en"}
+                },
+                "listen": {"provider": {"type": "deepgram", "model": "nova-3"}},
+                "think": {
+                    "provider": {"type": "open_ai", "model": "gpt-4.1"},
+                    "prompt": complete_prompt,
+                },
+                "greeting": GREETING,
+            },
         }
 
         await sts_ws.send(json.dumps(config_message))
-        print("✅ Complete configuration sent with diary data and email capabilities")
+        print("✅ Complete configuration sent with diary data")
 
         async def sts_sender(sts_ws):
             print("sts_sender started")
@@ -122,23 +128,6 @@ async def twilio_handler(twilio_ws):
                     if decoded["type"] == "UserStartedSpeaking":
                         clear_message = {"event": "clear", "streamSid": streamsid}
                         await twilio_ws.send(json.dumps(clear_message))
-                    
-                    # Check for agent responses that might contain email triggers
-                    if decoded["type"] == "ConversationText" and decoded["role"] == "assistant":
-                        print("🤖 Processing agent response for email triggers...")
-                        response_parser = get_response_parser()
-                        email_result = response_parser.handle_agent_response(decoded["content"])
-                        
-                        if email_result["success"]:
-                            print(f"✅ Email sent successfully!")
-                            print(f"📧 Recipient: {email_result['recipient']}")
-                            print(f"📝 Subject: {email_result['subject']}")
-                        elif email_result.get("is_duplicate"):
-                            print(f"⏭️  Duplicate response detected, skipping email")
-                        elif email_result.get("error"):
-                            print(f"❌ Email error: {email_result['error']}")
-                        else:
-                            print(f"ℹ️  No email trigger found in response")
                     
                     continue
 
@@ -219,7 +208,6 @@ def main():
     print("Using optimized diary service with aggressive caching")
     print("Diary data pre-loaded for instant access")
     print("Complete prompt sent immediately - no updates needed")
-    print("Email trigger system integrated - agent can send emails")
     print(f"Limits: {DIARY_DAYS} days, {DIARY_MAX_ENTRIES} entries max, {DIARY_MAX_CHARS} characters max")
     loop = asyncio.get_event_loop()
     loop.run_until_complete(server)
