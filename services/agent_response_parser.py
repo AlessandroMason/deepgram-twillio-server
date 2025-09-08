@@ -7,7 +7,7 @@ import re
 import json
 import hashlib
 from typing import Dict, Any, Optional, Set
-from email_service import EmailService
+from services.email_service import EmailService
 from constants import CONTACTS
 
 class AgentResponseParser:
