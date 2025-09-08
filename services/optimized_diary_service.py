@@ -10,6 +10,7 @@ import json
 import time
 from functools import lru_cache
 from collections import defaultdict
+import pytz
 
 class OptimizedDiaryService:
     def __init__(self, service_account_path: str = None, password: str = "123456"):
@@ -36,6 +37,7 @@ class OptimizedDiaryService:
         self.cache = {}
         self.cache_ttl = 300  # 5 minutes cache TTL
         self.last_fetch_time = 0
+        self.ny_tz = pytz.timezone('America/New_York')
         
     def deterministic_decryption(self, encrypted_string: str) -> str:
         """
@@ -111,6 +113,32 @@ class OptimizedDiaryService:
         # Handle other types
         return str(value)
     
+    def _convert_to_ny_time(self, time_str: str, date_str: str) -> str:
+        """
+        Convert time string to NY timezone
+        """
+        try:
+            # Parse the time string
+            time_dt = self._parse_time_string(time_str)
+            if not time_dt:
+                return time_str
+            
+            # If time doesn't have date, use the provided date
+            if time_dt.date() == datetime(1900, 1, 1).date():
+                date_dt = datetime.strptime(date_str, "%Y-%m-%d")
+                time_dt = time_dt.replace(year=date_dt.year, month=date_dt.month, day=date_dt.day)
+            
+            # Convert to NY timezone
+            if time_dt.tzinfo is None:
+                time_dt = pytz.utc.localize(time_dt)
+            
+            ny_time = time_dt.astimezone(self.ny_tz)
+            return ny_time.strftime("%H:%M:%S")
+            
+        except Exception as e:
+            print(f"Error converting time to NY timezone: {e}")
+            return time_str
+    
     def get_diary_entries_optimized(self, user_id: str, days: int = 4, max_entries: int = 100) -> List[Dict[str, Any]]:
         """
         Optimized method to fetch diary entries with caching and limits
@@ -181,7 +209,7 @@ class OptimizedDiaryService:
                             
                             # Convert Firestore values to strings
                             time_str = self._convert_firestore_value(time_data.get('time', ''))
-                            lasttime_str = self._convert_firestore_value(time_data.get('lasstime', ''))
+                            lasttime_str = self._convert_firestore_value(time_data.get('lasttime', ''))
                             action = self._convert_firestore_value(time_data.get('action', ''))
                             description = self._convert_firestore_value(time_data.get('description', ''))
                             
@@ -199,18 +227,23 @@ class OptimizedDiaryService:
                                 except:
                                     pass  # Keep original if decryption fails
                             
+                            # Convert times to NY timezone
+                            date_str_formatted = doc_date.strftime("%Y-%m-%d")
+                            ny_time = self._convert_to_ny_time(time_str, date_str_formatted)
+                            ny_lasttime = self._convert_to_ny_time(lasttime_str, date_str_formatted)
+                            
                             # Extract the required fields
                             entry = {
-                                'date': doc_date.strftime("%Y-%m-%d"),
-                                'time': time_str,
-                                'lasttime': lasttime_str,
+                                'date': date_str_formatted,
+                                'time': ny_time,
+                                'lasttime': ny_lasttime,
                                 'action': action,
                                 'description': description,
                                 'time_id': time_id
                             }
                             
                             # Calculate duration
-                            duration = self._calculate_duration(entry['time'], entry['lasttime'])
+                            duration = self._calculate_duration(ny_time, ny_lasttime)
                             entry['duration'] = duration
                             
                             print(f"  ⏱️  Duration: {duration}")
@@ -341,22 +374,22 @@ class OptimizedDiaryService:
                     formatted_entries.append("")  # Empty line between days
                 
                 current_date = entry['date']
-                day_header = f"📅 **{current_date}**"
+                day_header = f"DATE: {current_date}"
                 formatted_entries.append(day_header)
                 current_chars += len(day_header) + 1  # +1 for newline
             
             # Format the entry
-            formatted_entry = f"  ⏰ {entry['time']} ({entry['duration']})"
+            formatted_entry = f"TIME: {entry['time']} | DURATION: {entry['duration']}"
             
             if entry['action']:
-                formatted_entry += f" - {entry['action']}"
+                formatted_entry += f" | ACTION: {entry['action']}"
             
             if entry['description']:
                 # Truncate description if too long
                 description = entry['description']
                 if len(description) > 200:
                     description = description[:200] + "..."
-                formatted_entry += f"\n    {description}"
+                formatted_entry += f" | DESCRIPTION: {description}"
             
             # Check if adding this entry would exceed the character limit
             entry_chars = len(formatted_entry) + 2  # +2 for newlines
@@ -388,7 +421,10 @@ class OptimizedDiaryService:
         if formatted_entries == "No diary entries found for the last 4 days.":
             return formatted_entries
         
-        return f"Here are Alessandro's diary entries from the last {days} days (most recent day first):\n\n{formatted_entries}"
+        # Get current time in NY timezone
+        current_time_ny = datetime.now(self.ny_tz).strftime("%Y-%m-%d %H:%M:%S %Z")
+        
+        return f"CURRENT TIME (NY): {current_time_ny}\n\nDIARY ENTRIES (last {days} days, most recent first, all times in NY timezone):\n\n{formatted_entries}"
     
     def clear_cache(self):
         """
