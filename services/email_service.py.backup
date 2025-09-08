@@ -8,14 +8,14 @@ from typing import Dict, Any, Optional
 import re
 
 class EmailService:
-    def __init__(self, openai_api_key: str = None, gmail_email: str = "axm2022@case.edu", gmail_password: str = None):
+    def __init__(self, openai_api_key: str = None, gmail_email: str = "axm2022@case.edu", gmail_password: str = "iwtn sges urbz tkuo"):
         """
         Initialize email service with OpenAI and Gmail SMTP integration
         
         Args:
             openai_api_key: OpenAI API key
             gmail_email: Gmail email address
-            gmail_password: Gmail app password (if None, will use GMAIL_PASSWORD env var)
+            gmail_password: Gmail app password
         """
         if openai_api_key is None:
             openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -23,69 +23,9 @@ class EmailService:
         if not openai_api_key:
             raise ValueError("OpenAI API key not provided. Set OPENAI_API_KEY environment variable or pass openai_api_key parameter.")
         
-        if gmail_password is None:
-            gmail_password = os.getenv("GMAIL_PASSWORD")
-        
-        if not gmail_password:
-            raise ValueError("Gmail password not provided. Set GMAIL_PASSWORD environment variable or pass gmail_password parameter.")
-        
         self.openai_client = openai.OpenAI(api_key=openai_api_key)
         self.gmail_email = gmail_email
         self.gmail_password = gmail_password
-        
-    def send_test_email(self, recipient: str = "axm2022@case.edu", subject: str = "Testing", body: str = "testing") -> bool:
-        """
-        Send a simple test email
-        
-        Args:
-            recipient: Email recipient (default: axm2022@case.edu)
-            subject: Email subject (default: "Testing")
-            body: Email body (default: "testing")
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            # Create message
-            message = MIMEMultipart()
-            message['From'] = self.gmail_email
-            message['To'] = recipient
-            message['Subject'] = subject
-            
-            # Add body
-            message.attach(MIMEText(body, 'plain'))
-            
-            # Connect to Gmail SMTP server
-            server = smtplib.SMTP('smtp.gmail.com', 587)
-            server.starttls()
-            server.login(self.gmail_email, self.gmail_password)
-            
-            # Send email
-            text = message.as_string()
-            server.sendmail(self.gmail_email, recipient, text)
-            server.quit()
-            
-            print(f"✅ Test email sent successfully to {recipient}")
-            return True
-            
-        except Exception as e:
-            print(f"❌ Error sending test email: {e}")
-            return False
-    
-    def check_and_trigger_email(self, agent_reply: str) -> bool:
-        """
-        Check if agent reply contains 'email' and trigger email sending
-        
-        Args:
-            agent_reply: The agent's response text
-            
-        Returns:
-            True if email was sent, False otherwise
-        """
-        if "email" in agent_reply.lower():
-            print("📧 Agent reply contains 'email' - triggering test email...")
-            return self.send_test_email()
-        return False
         
     def generate_email_content(self, recipient: str, description: str, context: str = "") -> Dict[str, str]:
         """
@@ -378,7 +318,7 @@ def main():
         
     except Exception as e:
         print(f"❌ Error: {e}")
-        print("Make sure to set the OPENAI_API_KEY and GMAIL_PASSWORD environment variables")
+        print("Make sure to set the OPENAI_API_KEY environment variable")
 
 if __name__ == "__main__":
     main()
