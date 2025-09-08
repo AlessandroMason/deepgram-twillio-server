@@ -6,7 +6,7 @@ import websockets
 import ssl
 import os
 from services.optimized_diary_service import OptimizedDiaryService
-from services.email_service import EmailService
+#from services.email_service import EmailService
 from constants import (
     INITIAL_PROMPT, 
     GREETING, 
@@ -38,10 +38,8 @@ def get_diary_service():
         diary_service = OptimizedDiaryService()
     return diary_service
 
-def get_email_service():
-    """
-    Get or create the global email service instance
-    """
+""" def get_email_service():
+   
     global email_service
     if email_service is None:
         try:
@@ -49,7 +47,7 @@ def get_email_service():
         except ValueError as e:
             print(f"⚠️  Email service not available: {e}")
             email_service = None
-    return email_service
+    return email_service """
 
 def sts_connect():
     # you can run export DEEPGRAM_API_KEY="your key" in your terminal to set your API key.
@@ -167,9 +165,9 @@ async def twilio_handler(twilio_ws, use_personal=True):
                         if agent_text:
                             print(f"🤖 Agent response: {agent_text}")
                             # Check if email service is available and trigger email
-                            email_svc = get_email_service()
+                            """ email_svc = get_email_service()
                             if email_svc:
-                                email_svc.check_and_trigger_email(agent_text)
+                                email_svc.check_and_trigger_email(agent_text) """
                     
                     continue
  
@@ -262,12 +260,12 @@ def main():
     print(f"Personal limits: {DIARY_DAYS} days, {DIARY_MAX_ENTRIES} entries max, {DIARY_MAX_CHARS} characters max")
     
     # Check if email service is available
-    email_svc = get_email_service()
+    """ email_svc = get_email_service()
     if email_svc:
         print("✅ Email service initialized - will trigger emails when agent replies contain 'email' (personal endpoint only)")
     else:
         print("⚠️  Email service not available - set GMAIL_PASSWORD environment variable to enable")
-    
+     """
     loop = asyncio.get_event_loop()
     loop.run_until_complete(server)
     loop.run_forever()
