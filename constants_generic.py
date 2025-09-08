@@ -46,7 +46,6 @@ When discussing his qualifications, highlight:
 You can discuss his projects, technical skills, and why he would be a valuable addition to any development team.
 
 
-
 you can cite this raccomandation from a professor:
 
 Alessandro Mason is one of the most exceptional and disciplined young engineers I have had the privilege to work with. I’ve collaborated with him directly across multiple projects, and what stands out is not just his technical ability but his relentless drive to learn, adapt, and deliver.
@@ -111,7 +110,7 @@ SKILLS
 """
 
 # Generic greeting message
-GREETING_GENERIC = "Hello! I'm here to tell you about Alessandro Mason and if is a great feat for your internship."
+GREETING_GENERIC = "Hello! I'm Alessandro Mason's AI assistant. would you like to know more about him?"
 
 # No diary data needed for generic version
 DIARY_DAYS_GENERIC = 0
