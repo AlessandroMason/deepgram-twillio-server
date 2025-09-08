@@ -172,7 +172,7 @@ async def twilio_handler(twilio_ws, use_personal=True):
                                 email_svc.check_and_trigger_email(agent_text)
                     
                     continue
-
+ 
                 print(type(message))
                 raw_mulaw = message
 
