@@ -56,9 +56,10 @@ def sts_connect():
     if not api_key:
         raise ValueError("DEEPGRAM_API_KEY environment variable is not set")
 
-    return websockets.connect(
+    sts_ws = websockets.connect(
         "wss://agent.deepgram.com/v1/agent/converse", subprotocols=["token", api_key]
     )
+    return sts_ws
 
 
 def get_complete_prompt():
@@ -86,38 +87,17 @@ def get_complete_prompt():
 
 async def twilio_handler(twilio_ws):
     print("twilio_handler started")
+    sts_ws = await sts_connect()
     audio_queue = asyncio.Queue()
     streamsid_queue = asyncio.Queue()
 
-    async with sts_connect() as sts_ws:
-        # Get complete prompt with diary data immediately
+    async with sts_ws as sts_ws:
         complete_prompt = get_complete_prompt()
         
-        # Configuration with complete prompt from the start
         config_message = {
-            "type": "Settings",
-            "audio": {
-                "input": {
-                    "encoding": "mulaw",
-                    "sample_rate": 8000,
-                },
-                "output": {
-                    "encoding": "mulaw",
-                    "sample_rate": 8000,
-                    "container": "none",
-                },
-            },
-            "agent": {
-                "speak": {
-                    "provider": {"type": "deepgram", "model": "aura-2-odysseus-en"}
-                },
-                "listen": {"provider": {"type": "deepgram", "model": "nova-3"}},
-                "think": {
-                    "provider": {"type": "open_ai", "model": "gpt-4.1"},
-                    "prompt": complete_prompt,
-                },
-                "greeting": GREETING,
-            },
+            "type": "ConversationText",
+            "role": "assistant",
+            "content": complete_prompt,
         }
 
         await sts_ws.send(json.dumps(config_message))
@@ -209,10 +189,10 @@ async def twilio_handler(twilio_ws):
                 except:
                     break
 
-            # the async for loop will end if the ws connection from twilio dies
-            # and if this happens, we should forward an some kind of message to sts
-            # to signal sts to send back remaining messages before closing(?)
-            # audio_queue.put_nowait(b'')
+        # the async for loop will end if the ws connection from twilio dies
+        # and if this happens, we should forward an some kind of message to sts
+        # to signal sts to send back remaining messages before closing(?)
+        # audio_queue.put_nowait(b'')
 
         await asyncio.wait(
             [
