@@ -7,6 +7,45 @@ Fast way to test diary loading and prompt generation
 import os
 import sys
 from services.optimized_diary_service import OptimizedDiaryService
+from constants import (
+    INITIAL_PROMPT, 
+    GREETING, 
+    USER_ID, 
+    DIARY_DAYS, 
+    DIARY_MAX_ENTRIES, 
+    DIARY_MAX_CHARS,
+    FALLBACK_DIARY
+)
+
+def get_complete_prompt():
+    """
+    Get the complete prompt with diary data included immediately
+    """
+    try:
+        # Get the optimized service
+        service = OptimizedDiaryService()
+        
+        # Get formatted diary entries with limits
+        diary_section = service.get_diary_prompt_section(
+            USER_ID, 
+            days=DIARY_DAYS, 
+            max_entries=DIARY_MAX_ENTRIES, 
+            max_chars=DIARY_MAX_CHARS
+        )
+        
+        # Combine initial prompt with diary data
+        complete_prompt = f"""{INITIAL_PROMPT}
+
+{diary_section}"""
+        
+        return complete_prompt
+        
+    except Exception as e:
+        print(f"Error fetching diary entries: {e}")
+        # Fallback to static diary content if Firebase fails
+        return f"""{INITIAL_PROMPT}
+
+{FALLBACK_DIARY}"""
 
 def quick_test():
     """Quick test of diary service and prompt generation"""
@@ -20,42 +59,29 @@ def quick_test():
     
     try:
         # Test diary service
-        print("🔄 Testing diary service...")
-        service = OptimizedDiaryService()
-        user_id = "qkr7puLMnfOvZP5T967rJNyqOsv1"
-        
-        # Get diary data
-        diary_section = service.get_diary_prompt_section(user_id, days=4, max_entries=100, max_chars=8000)
-        
-        # Create full prompt
-        full_prompt = f"""you are a friend and mentor in a phonecall with Alessandro, be masculine. direct. use coaching techniques to guide him but also bring up topics if you want and if you retain necessary. I attach some of his diary so you know him better
-
-{diary_section}"""
+        print("🔄 Testing complete prompt generation...")
+        complete_prompt = get_complete_prompt()
         
         # Show results
-        print(f"✅ Diary loaded: {len(diary_section)} characters")
-        print(f"✅ Full prompt: {len(full_prompt)} characters")
+        print(f"✅ Complete prompt: {len(complete_prompt)} characters")
         print(f"✅ Deepgram limit: 25,000 characters")
-        print(f"✅ Usage: {(len(full_prompt)/25000)*100:.1f}%")
+        print(f"✅ Usage: {(len(complete_prompt)/25000)*100:.1f}%")
         
-        if len(full_prompt) > 25000:
+        if len(complete_prompt) > 25000:
             print("⚠️  WARNING: Prompt too long!")
-        elif len(full_prompt) > 20000:
+        elif len(complete_prompt) > 20000:
             print("⚠️  WARNING: Prompt close to limit")
         else:
             print("✅ Prompt size is good")
         
-        # Show sample of diary data
-        print(f"\n📝 DIARY SAMPLE (first 800 chars):")
+        # Show sample of complete prompt
+        print(f"\n📝 COMPLETE PROMPT SAMPLE (first 800 chars):")
         print("-" * 40)
-        print(diary_section[:800] + "..." if len(diary_section) > 800 else diary_section)
+        print(complete_prompt[:800] + "..." if len(complete_prompt) > 800 else complete_prompt)
         print("-" * 40)
         
-        # Show prompt sample
-        print(f"\n📝 PROMPT SAMPLE (first 400 chars):")
-        print("-" * 40)
-        print(full_prompt[:400] + "..." if len(full_prompt) > 400 else full_prompt)
-        print("-" * 40)
+        # Show greeting
+        print(f"\n👋 GREETING: {GREETING}")
         
         # Show timezone info
         from datetime import datetime
@@ -65,6 +91,8 @@ def quick_test():
         print(f"\n🕐 CURRENT NY TIME: {current_time_ny}")
         
         print("\n🎉 Quick test complete!")
+        print("\n💡 To modify prompts, edit constants.py")
+        print("💡 Complete prompt is sent immediately - no updates needed")
         
     except Exception as e:
         print(f"❌ Error: {e}")

@@ -15,7 +15,7 @@ import pytz
 class OptimizedDiaryService:
     def __init__(self, service_account_path: str = None, password: str = "123456"):
         """
-        Initialize optimized Firebase diary service with caching and decryption
+        Initialize optimized Firebase diary service with aggressive caching
         
         Args:
             service_account_path: Path to Firebase service account JSON file
@@ -35,10 +35,23 @@ class OptimizedDiaryService:
         self.db = firestore.client()
         self.password = password
         self.cache = {}
-        self.cache_ttl = 300  # 5 minutes cache TTL
+        self.cache_ttl = 600  # 10 minutes cache TTL
         self.last_fetch_time = 0
         self.ny_tz = pytz.timezone('America/New_York')
         
+        # Pre-load diary data on initialization
+        self._preload_diary_data()
+        
+    def _preload_diary_data(self):
+        """Pre-load diary data on service initialization for instant access"""
+        try:
+            print("🔄 Pre-loading diary data for instant access...")
+            user_id = "qkr7puLMnfOvZP5T967rJNyqOsv1"
+            self.get_diary_entries_optimized(user_id, days=4, max_entries=100)
+            print("✅ Diary data pre-loaded successfully")
+        except Exception as e:
+            print(f"⚠️  Could not pre-load diary data: {e}")
+    
     def deterministic_decryption(self, encrypted_string: str) -> str:
         """
         Decrypt encrypted string using AES-256-ECB with deterministic key generation
@@ -141,7 +154,7 @@ class OptimizedDiaryService:
     
     def get_diary_entries_optimized(self, user_id: str, days: int = 4, max_entries: int = 100) -> List[Dict[str, Any]]:
         """
-        Optimized method to fetch diary entries with caching and limits
+        Optimized method to fetch diary entries with aggressive caching
         
         Args:
             user_id: The user ID in Firebase
@@ -153,13 +166,14 @@ class OptimizedDiaryService:
         """
         cache_key = self._get_cache_key(user_id, days)
         
-        # Check cache first
+        # Check cache first - return immediately if valid
         if cache_key in self.cache and self._is_cache_valid():
-            print(f"🔄 Using cached data for {user_id}")
+            print(f"⚡ Using cached data for {user_id} (instant)")
             cached_entries = self.cache[cache_key]
             return cached_entries[:max_entries]
         
-        print(f"🔄 Fetching fresh data for {user_id} (last {days} days)")
+        # Only fetch if cache is invalid (every 10 minutes)
+        print(f"🔄 Cache expired, fetching fresh data for {user_id} (last {days} days)")
         
         # Calculate date range
         end_date = datetime.now()
@@ -209,7 +223,7 @@ class OptimizedDiaryService:
                             
                             # Convert Firestore values to strings
                             time_str = self._convert_firestore_value(time_data.get('time', ''))
-                            lasttime_str = self._convert_firestore_value(time_data.get('lasttime', ''))
+                            lasttime_str = self._convert_firestore_value(time_data.get('lasstime', ''))
                             action = self._convert_firestore_value(time_data.get('action', ''))
                             description = self._convert_firestore_value(time_data.get('description', ''))
                             
@@ -281,7 +295,7 @@ class OptimizedDiaryService:
             print(f"📊 Showing most recent {len(sorted_entries)} entries")
             print(f"📅 Days covered: {len(set(entry['date'] for entry in sorted_entries))}")
         
-        # Update cache
+        # Update cache with longer TTL
         self.cache[cache_key] = sorted_entries
         self.last_fetch_time = time.time()
         
@@ -424,7 +438,18 @@ class OptimizedDiaryService:
         # Get current time in NY timezone
         current_time_ny = datetime.now(self.ny_tz).strftime("%Y-%m-%d %H:%M:%S %Z")
         
-        return f"CURRENT TIME (NY): {current_time_ny}\n\nDIARY ENTRIES (last {days} days, most recent first, all times in NY timezone):\n\n{formatted_entries}"
+        return f"""CURRENT TIME (NY): {current_time_ny}
+
+CONTEXT: Use this diary data to check up on Alessandro, shame if waste, its not acceptable. Also use his 3 identities to motivate him, and ask him to recall examples of those three identities.
+
+IDENTITIES:
+1. "Im a disciplined and healthy person" (workout meditation head good)
+2. "I do what im supposed to do independently of my feelings in the moment" (working, training, school)
+3. "I live 100% in reality i dont consume entertainment" (no youtube, no sugar, no fap)
+
+DIARY ENTRIES (last {days} days, most recent first, all times in NY timezone):
+
+{formatted_entries}"""
     
     def clear_cache(self):
         """

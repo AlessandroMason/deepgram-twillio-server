@@ -10,53 +10,45 @@ import os
 import sys
 from datetime import datetime
 from services.optimized_diary_service import OptimizedDiaryService
+from constants import (
+    INITIAL_PROMPT, 
+    GREETING, 
+    USER_ID, 
+    DIARY_DAYS, 
+    DIARY_MAX_ENTRIES, 
+    DIARY_MAX_CHARS,
+    FALLBACK_DIARY
+)
 
-def get_diary_prompt_section():
+def get_complete_prompt():
     """
-    Get diary entries from Firebase and format them for the prompt with limits
+    Get the complete prompt with diary data included immediately
     """
     try:
-        # User ID from the path provided
-        user_id = "qkr7puLMnfOvZP5T967rJNyqOsv1"
-        
         # Get the optimized service
         service = OptimizedDiaryService()
         
-        # Get formatted diary entries with limits to prevent prompt from being too long
-        # Limit to 4 days, 100 entries max, 8000 characters max
+        # Get formatted diary entries with limits
         diary_section = service.get_diary_prompt_section(
-            user_id, 
-            days=4, 
-            max_entries=100, 
-            max_chars=8000
+            USER_ID, 
+            days=DIARY_DAYS, 
+            max_entries=DIARY_MAX_ENTRIES, 
+            max_chars=DIARY_MAX_CHARS
         )
         
-        return diary_section
+        # Combine initial prompt with diary data
+        complete_prompt = f"""{INITIAL_PROMPT}
+
+{diary_section}"""
+        
+        return complete_prompt
         
     except Exception as e:
-        print(f"❌ Error fetching diary entries: {e}")
+        print(f"Error fetching diary entries: {e}")
         # Fallback to static diary content if Firebase fails
-        return """12:45 - Reflecting [15 min]
-writing a lit of the diary. Still debating if keeping it private or making it public, while i
-write there is a difference vibe absed on if its going to get shown or not whatever i
-should sleep a little now.
-Also since this morning (at the start of the run) my right ball hurts, but i think it might
-have to do with me practicing my kicking skills on the tree and having fucked up some
-muscle or tendon in that area, not sure but since there is a clear trauma ill not worry
-about it.
-also looking at what i have done one year ago and send screens to BJ and Jasper about
-the night. its cool to stay in touch that way.
-13:00 - Sleep [15 min]
-good nap, i found a place where i can actually nap on a table, its outside the view form
-the door so they dont see me, but still see my laptop and stuff so will not come in.
-great place to nap and recharge before the next leetcode streak. (that i start now i
-guess)
-14:00 - leetcode [1 h]
-leetcoding session, finally solved a couple of medium problmes withouth help form
-chat in a straightforeward manner, were both matrix problems and the ML practice i
-have done this morning really helped, found a window problem and losing focus. ill
-nap for 15 min and be back on the grind for a final 45 min then do my resume for
-Saab, apply to interships, idk other work that feels lighter"""
+        return f"""{INITIAL_PROMPT}
+
+{FALLBACK_DIARY}"""
 
 def print_section(title, content, max_width=80):
     """Print a formatted section"""
@@ -100,64 +92,34 @@ def debug_deepgram_config():
     print("🔍 DEEPGRAM VOICE AGENT DEBUG")
     print(f"🕐 Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
-    # 1. Initial Configuration
-    initial_config = {
-        "type": "Settings",
-        "audio": {
-            "input": {
-                "encoding": "mulaw",
-                "sample_rate": 8000,
-            },
-            "output": {
-                "encoding": "mulaw",
-                "sample_rate": 8000,
-                "container": "none",
-            },
-        },
-        "agent": {
-            "speak": {
-                "provider": {"type": "deepgram", "model": "aura-2-odysseus-en"}
-            },
-            "listen": {"provider": {"type": "deepgram", "model": "nova-3"}},
-            "think": {
-                "provider": {"type": "open_ai", "model": "gpt-4.1"},
-                "prompt": """you are a friend and mentor in a phonecall with Alessandro, be masculine. direct. use coaching techniques to guide him but also bring up topics if you want and if you retain necessary. I will provide you with his diary entries shortly.""",
-            },
-            "greeting": "Hi Ale! Kayros Ai here.",
-        },
-    }
+    # 1. Show Constants
+    print_section("1. CONSTANTS FROM constants.py", f"""
+INITIAL_PROMPT: {len(INITIAL_PROMPT)} characters
+GREETING: {GREETING}
+USER_ID: {USER_ID}
+DIARY_DAYS: {DIARY_DAYS}
+DIARY_MAX_ENTRIES: {DIARY_MAX_ENTRIES}
+DIARY_MAX_CHARS: {DIARY_MAX_CHARS}
+""")
     
-    print_json_section("1. INITIAL CONFIGURATION", initial_config)
-    
-    # 2. Load Diary Data
-    print("\n🔄 Loading diary data...")
+    # 2. Load Complete Prompt
+    print("\n🔄 Loading complete prompt with diary data...")
     try:
-        diary_content = get_diary_prompt_section()
-        print("✅ Diary data loaded successfully")
+        complete_prompt = get_complete_prompt()
+        print("✅ Complete prompt loaded successfully")
     except Exception as e:
-        print(f"❌ Error loading diary data: {e}")
+        print(f"❌ Error loading complete prompt: {e}")
         return
     
-    # 3. Create Updated Prompt
-    updated_prompt = f"""you are a friend and mentor in a phonecall with Alessandro, be masculine. direct. use coaching techniques to guide him but also bring up topics if you want and if you retain necessary. I attach some of his diary so you know him better
-
-{diary_content}"""
+    # 3. Show Diary Section
+    diary_section = complete_prompt.replace(INITIAL_PROMPT, "").strip()
+    print_section("2. DIARY SECTION", diary_section)
     
-    print_section("2. DIARY CONTENT", diary_content)
+    # 4. Analyze Complete Prompt
+    analyze_prompt(complete_prompt)
     
-    # 4. Analyze Prompt
-    analyze_prompt(updated_prompt)
-    
-    # 5. UpdatePrompt Message
-    update_message = {
-        "type": "UpdatePrompt",
-        "prompt": updated_prompt
-    }
-    
-    print_json_section("3. UPDATEPROMPT MESSAGE", update_message)
-    
-    # 6. Final Configuration (what the agent will have)
-    final_config = {
+    # 5. Complete Configuration
+    config_message = {
         "type": "Settings",
         "audio": {
             "input": {
@@ -177,16 +139,16 @@ def debug_deepgram_config():
             "listen": {"provider": {"type": "deepgram", "model": "nova-3"}},
             "think": {
                 "provider": {"type": "open_ai", "model": "gpt-4.1"},
-                "prompt": updated_prompt,
+                "prompt": complete_prompt,
             },
-            "greeting": "Hi Ale! Kayros Ai here.",
+            "greeting": GREETING,
         },
     }
     
-    print_json_section("4. FINAL CONFIGURATION (After UpdatePrompt)", final_config)
+    print_json_section("3. COMPLETE CONFIGURATION", config_message)
     
-    # 7. Summary
-    print_section("5. SUMMARY", f"""
+    # 6. Summary
+    print_section("4. SUMMARY", f"""
 🎯 VOICE AGENT CONFIGURATION SUMMARY:
 
 📡 Audio Settings:
@@ -197,20 +159,25 @@ def debug_deepgram_config():
   • Speech: Deepgram Aura-2-Odysseus-EN
   • Listening: Deepgram Nova-3
   • Thinking: OpenAI GPT-4.1
-  • Greeting: "Hi Ale! Kayros Ai here."
+  • Greeting: "{GREETING}"
 
 📝 Prompt Configuration:
-  • Initial: Basic mentor prompt
-  • Updated: Includes diary data from last 4 days
-  • Character count: {len(updated_prompt)}
+  • Complete prompt: {len(complete_prompt)} characters
   • Deepgram limit: 25,000 characters
-  • Usage: {(len(updated_prompt)/25000)*100:.1f}%
+  • Usage: {(len(complete_prompt)/25000)*100:.1f}%
 
 🔄 Flow:
-  1. Call starts with basic prompt
-  2. Diary data loads in background
-  3. UpdatePrompt message sent with full context
-  4. Agent now has complete context
+  1. Server starts → Pre-loads diary data
+  2. Call comes in → Gets complete prompt with diary data
+  3. Sends complete configuration to Deepgram immediately
+  4. No updates needed - everything is ready from the start
+
+⚡ Performance:
+  • Diary data pre-loaded on startup
+  • Cache TTL: 10 minutes
+  • Instant access to cached data
+  • Complete prompt sent immediately
+  • No UpdatePrompt complexity
 
 ✅ Ready for voice calls!
 """)
@@ -222,15 +189,14 @@ def test_diary_service():
     
     try:
         service = OptimizedDiaryService()
-        user_id = "qkr7puLMnfOvZP5T967rJNyqOsv1"
         
         print("🔄 Fetching diary entries...")
-        entries = service.get_diary_entries_optimized(user_id, days=4, max_entries=100)
+        entries = service.get_diary_entries_optimized(USER_ID, days=DIARY_DAYS, max_entries=DIARY_MAX_ENTRIES)
         
         print(f"✅ Fetched {len(entries)} entries")
         
         if entries:
-            print(f"�� Date range: {entries[-1]['date']} to {entries[0]['date']}")
+            print(f"📅 Date range: {entries[-1]['date']} to {entries[0]['date']}")
             print(f"📅 Days covered: {len(set(entry['date'] for entry in entries))}")
             
             # Show first few entries
@@ -243,7 +209,7 @@ def test_diary_service():
         
         # Test formatting
         print("\n🔄 Testing prompt formatting...")
-        formatted = service.format_entries_for_prompt(entries, max_chars=8000)
+        formatted = service.format_entries_for_prompt(entries, max_chars=DIARY_MAX_CHARS)
         print(f"✅ Formatted prompt: {len(formatted)} characters")
         
     except Exception as e:
@@ -282,7 +248,8 @@ def main():
     print("  • Check the prompt length - should be under 25,000 characters")
     print("  • Verify diary data is loading correctly")
     print("  • Make sure environment variables are set")
-    print("  • Test with actual voice call to see if UpdatePrompt works")
+    print("  • Test with actual voice call")
+    print("  • Modify prompts in constants.py")
 
 if __name__ == "__main__":
     main()

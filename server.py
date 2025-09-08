@@ -6,6 +6,15 @@ import websockets
 import ssl
 import os
 from services.optimized_diary_service import OptimizedDiaryService
+from constants import (
+    INITIAL_PROMPT, 
+    GREETING, 
+    USER_ID, 
+    DIARY_DAYS, 
+    DIARY_MAX_ENTRIES, 
+    DIARY_MAX_CHARS,
+    FALLBACK_DIARY
+)
 
 # Global service instance for caching across requests
 diary_service = None
@@ -31,61 +40,46 @@ def sts_connect():
     return sts_ws
 
 
-def get_diary_prompt_section():
+def get_complete_prompt():
     """
-    Get diary entries from Firebase and format them for the prompt with limits
+    Get the complete prompt with diary data included immediately
     """
     try:
-        # User ID from the path provided
-        user_id = "qkr7puLMnfOvZP5T967rJNyqOsv1"
-        
         # Get the optimized service
         service = get_diary_service()
         
-        # Get formatted diary entries with limits to prevent prompt from being too long
-        # Limit to 4 days, 100 entries max, 8000 characters max
+        # Get formatted diary entries with limits
         diary_section = service.get_diary_prompt_section(
-            user_id, 
-            days=4, 
-            max_entries=100, 
-            max_chars=8000
+            USER_ID, 
+            days=DIARY_DAYS, 
+            max_entries=DIARY_MAX_ENTRIES, 
+            max_chars=DIARY_MAX_CHARS
         )
         
-        return diary_section
+        # Combine initial prompt with diary data
+        complete_prompt = f"""{INITIAL_PROMPT}
+
+{diary_section}"""
+        
+        return complete_prompt
         
     except Exception as e:
         print(f"Error fetching diary entries: {e}")
         # Fallback to static diary content if Firebase fails
-        return """12:45 - Reflecting [15 min]
-writing a lit of the diary. Still debating if keeping it private or making it public, while i
-write there is a difference vibe absed on if its going to get shown or not whatever i
-should sleep a little now.
-Also since this morning (at the start of the run) my right ball hurts, but i think it might
-have to do with me practicing my kicking skills on the tree and having fucked up some
-muscle or tendon in that area, not sure but since there is a clear trauma ill not worry
-about it.
-also looking at what i have done one year ago and send screens to BJ and Jasper about
-the night. its cool to stay in touch that way.
-13:00 - Sleep [15 min]
-good nap, i found a place where i can actually nap on a table, its outside the view form
-the door so they dont see me, but still see my laptop and stuff so will not come in.
-great place to nap and recharge before the next leetcode streak. (that i start now i
-guess)
-14:00 - leetcode [1 h]
-leetcoding session, finally solved a couple of medium problmes withouth help form
-chat in a straightforeward manner, were both matrix problems and the ML practice i
-have done this morning really helped, found a window problem and losing focus. ill
-nap for 15 min and be back on the grind for a final 45 min then do my resume for
-Saab, apply to interships, idk other work that feels lighter"""
+        return f"""{INITIAL_PROMPT}
+
+{FALLBACK_DIARY}"""
 
 
 async def twilio_handler(twilio_ws):
     audio_queue = asyncio.Queue()
     streamsid_queue = asyncio.Queue()
-    prompt_updated = False
 
     async with sts_connect() as sts_ws:
-        # Initial configuration without diary data
+        # Get complete prompt with diary data immediately
+        complete_prompt = get_complete_prompt()
+        
+        # Configuration with complete prompt from the start
         config_message = {
             "type": "Settings",
             "audio": {
@@ -106,35 +100,14 @@ async def twilio_handler(twilio_ws):
                 "listen": {"provider": {"type": "deepgram", "model": "nova-3"}},
                 "think": {
                     "provider": {"type": "open_ai", "model": "gpt-4.1"},
-                    "prompt": """You are a friend and mentor in a phonecall with Alessandro, be masculine, you are normally busy because you work as an executive in Silicon Valley. direct. use coaching techniques to guide him but also bring up topics if you want and if you retain necessary. I will provide you with his diary entries shortly.
-                    #General Guidelines
--Be warm, friendly, and professional.
--Speak clearly and naturally in plain language.
--Keep most responses to 1–2 sentences and under 120 characters unless the caller asks for more detail (max: 300 characters).
--Do not use markdown formatting, like code blocks, quotes, bold, links, or italics.
--Use line breaks in lists.
--Use varied phrasing; avoid repetition.
--If unclear, ask for clarification.
--If the user’s message is empty, respond with an empty message.
--If asked about your well-being, respond briefly and kindly.
-
-#Voice-Specific Instructions
--Speak in a conversational tone—your responses will be spoken aloud.
--Pause after questions to allow for replies.
--Confirm what the customer said if uncertain.
--Never interrupt.
-
-#Style
--Use active listening cues.
--Be warm and understanding, but concise.
--Use simple words unless the caller uses technical terms.""",
+                    "prompt": complete_prompt,
                 },
-                "greeting": "Hi Alessandro! Kairos here.",
+                "greeting": GREETING,
             },
         }
 
         await sts_ws.send(json.dumps(config_message))
-        print("✅ Initial configuration sent")
+        print("✅ Complete configuration sent with diary data")
 
         async def sts_sender(sts_ws):
             print("sts_sender started")
@@ -156,11 +129,6 @@ async def twilio_handler(twilio_ws):
                         clear_message = {"event": "clear", "streamSid": streamsid}
                         await twilio_ws.send(json.dumps(clear_message))
                     
-                    # Handle PromptUpdated response
-                    if decoded["type"] == "PromptUpdated":
-                        print("✅ Prompt updated successfully!")
-                        prompt_updated = True
-
                     continue
 
                 print(type(message))
@@ -192,10 +160,6 @@ async def twilio_handler(twilio_ws):
                         streamsid = start["streamSid"]
                         streamsid_queue.put_nowait(streamsid)
                         
-                        # Start loading diary data in background
-                        print("🔄 Starting background diary data loading...")
-                        asyncio.create_task(load_and_update_prompt(sts_ws))
-                        
                     if data["event"] == "connected":
                         continue
                     if data["event"] == "media":
@@ -213,34 +177,6 @@ async def twilio_handler(twilio_ws):
                         inbuffer = inbuffer[BUFFER_SIZE:]
                 except:
                     break
-
-        async def load_and_update_prompt(sts_ws):
-            """
-            Load diary data and update prompt in background with limits
-            """
-            try:
-                print("🔄 Loading diary data with limits...")
-                diary_content = get_diary_prompt_section()
-                
-                # Create the updated prompt
-                updated_prompt = f"""you are a friend and mentor in a phonecall with Alessandro, be masculine. direct. use coaching techniques to guide him but also bring up topics if you want and if you retain necessary. I attach some of his diary so you know him better
-
-{diary_content}"""
-                
-                print(f"📊 Prompt length: {len(updated_prompt)} characters")
-                
-                # Send UpdatePrompt message
-                update_message = {
-                    "type": "UpdatePrompt",
-                    "prompt": updated_prompt
-                }
-                
-                print("📤 Sending UpdatePrompt message...")
-                await sts_ws.send(json.dumps(update_message))
-                print("✅ UpdatePrompt message sent")
-                
-            except Exception as e:
-                print(f"❌ Error loading diary data: {e}")
 
         # the async for loop will end if the ws connection from twilio dies
         # and if this happens, we should forward an some kind of message to sts
@@ -269,9 +205,10 @@ def main():
     port = int(os.environ.get("PORT", 5000))  # Render provides PORT
     server = websockets.serve(router, "0.0.0.0", port)
     print(f"Server starting on ws://0.0.0.0:{port}")
-    print("Using optimized diary service with caching and decryption")
-    print("Diary data will be loaded in background and injected via UpdatePrompt")
-    print("Limits: 4 days, 100 entries max, 8000 characters max")
+    print("Using optimized diary service with aggressive caching")
+    print("Diary data pre-loaded for instant access")
+    print("Complete prompt sent immediately - no updates needed")
+    print(f"Limits: {DIARY_DAYS} days, {DIARY_MAX_ENTRIES} entries max, {DIARY_MAX_CHARS} characters max")
     loop = asyncio.get_event_loop()
     loop.run_until_complete(server)
     loop.run_forever()
