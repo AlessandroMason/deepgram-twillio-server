@@ -110,8 +110,9 @@ SKILLS
 """
 
 # Generic greeting message
-GREETING_GENERIC = "Hello! I'm Alessandro Mason's AI assistant. would you like to know more about him?"
-
+GREETING_GENERIC ="""
+Hi, I’m Alessandro Mason’s AI assistant. He’s a skilled engineer in full-stack and AI. What role are you hiring for? Would you like to hear more about his experiences, awards, or personal character?
+"""
 # No diary data needed for generic version
 DIARY_DAYS_GENERIC = 0
 DIARY_MAX_ENTRIES_GENERIC = 0
