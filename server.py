@@ -7,7 +7,7 @@ import ssl
 import os
 from services.optimized_diary_service import OptimizedDiaryService
 #from services.email_service import EmailService
-from constants import (
+from agents.constants import (
     INITIAL_PROMPT, 
     GREETING, 
     USER_ID, 
@@ -16,7 +16,7 @@ from constants import (
     DIARY_MAX_CHARS,
     FALLBACK_DIARY
 )
-from constants_generic import (
+from agents.constants_generic import (
     INITIAL_PROMPT_GENERIC,
     GREETING_GENERIC,
     DIARY_DAYS_GENERIC,

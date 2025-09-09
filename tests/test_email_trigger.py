@@ -3,7 +3,7 @@
 Test script for email trigger functionality
 """
 import os
-from services.email_service import EmailService
+from ..services.email_service import EmailService
 
 def test_email_service():
     """Test the email service with environment variables"""

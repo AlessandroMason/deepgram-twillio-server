@@ -7,8 +7,8 @@ import os
 import sys
 sys.path.append('.')
 
-from services.email_service import EmailService
-from constants import CONTACTS
+from ..services.email_service import EmailService
+from ..agents.constants import CONTACTS
 
 def test_email_system():
     """Test the email system with contact list"""

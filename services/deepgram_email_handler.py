@@ -7,7 +7,7 @@ import re
 import json
 from typing import Dict, Any, Optional
 from .email_service import EmailService
-from constants import CONTACTS
+from agents.constants import CONTACTS
 
 class DeepgramEmailHandler:
     def __init__(self, email_service: EmailService):
@@ -125,7 +125,7 @@ class DeepgramEmailHandler:
     
     def add_contact(self, name: str, email: str) -> bool:
         """
-        Add a new contact (this would need to update constants.py)
+        Add a new contact (this would need to update agents/constants.py)
         
         Args:
             name: Contact name
@@ -134,7 +134,7 @@ class DeepgramEmailHandler:
         Returns:
             True if successful
         """
-        # Note: This would need to update the constants.py file
+        # Note: This would need to update the agents/constants.py file
         # For now, just return success
         print(f"Contact '{name}' with email '{email}' would be added")
         return True

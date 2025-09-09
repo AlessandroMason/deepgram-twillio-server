@@ -6,8 +6,8 @@ Fast way to test diary loading and prompt generation
 
 import os
 import sys
-from services.optimized_diary_service import OptimizedDiaryService
-from constants import (
+from ..services.optimized_diary_service import OptimizedDiaryService
+from ..agents.constants import (
     INITIAL_PROMPT, 
     GREETING, 
     USER_ID, 
@@ -75,9 +75,9 @@ def quick_test():
             print("✅ Prompt size is good")
         
         # Show sample of complete prompt
-        print(f"\n📝 COMPLETE PROMPT SAMPLE (first 800 chars):")
+        print(f"\n📝 COMPLETE PROMPT SAMPLE (first 3000 chars):")
         print("-" * 40)
-        print(complete_prompt[:800] + "..." if len(complete_prompt) > 800 else complete_prompt)
+        print(complete_prompt[:3000] + "..." if len(complete_prompt) > 3000 else complete_prompt)
         print("-" * 40)
         
         # Show greeting
@@ -91,7 +91,7 @@ def quick_test():
         print(f"\n🕐 CURRENT NY TIME: {current_time_ny}")
         
         print("\n🎉 Quick test complete!")
-        print("\n💡 To modify prompts, edit constants.py")
+        print("\n💡 To modify prompts, edit agents/constants.py")
         print("💡 Complete prompt is sent immediately - no updates needed")
         
     except Exception as e:

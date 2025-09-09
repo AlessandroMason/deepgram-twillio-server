@@ -10,7 +10,7 @@ import time
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from services.optimized_diary_service import OptimizedDiaryService
+from ..services.optimized_diary_service import OptimizedDiaryService
 
 def test_diary_service():
     """

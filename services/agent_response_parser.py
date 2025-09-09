@@ -8,7 +8,7 @@ import json
 import hashlib
 from typing import Dict, Any, Optional, Set
 from services.email_service import EmailService
-from constants import CONTACTS
+from agents.constants import CONTACTS
 
 class AgentResponseParser:
     def __init__(self, email_service: EmailService):

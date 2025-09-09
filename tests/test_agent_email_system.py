@@ -10,8 +10,8 @@ import re
 import hashlib
 sys.path.append('.')
 
-from services.email_service import EmailService
-from constants import CONTACTS
+from ..services.email_service import EmailService
+from ..agents.constants import CONTACTS
 
 class AgentResponseParser:
     def __init__(self, email_service: EmailService):
@@ -184,7 +184,7 @@ def test_agent_email_system():
         # Test the updated prompt
         print(f"\n🤖 Updated Agent Prompt Preview:")
         print("-" * 40)
-        from constants import UPDATED_INITIAL_PROMPT
+        from ..agents.constants import UPDATED_INITIAL_PROMPT
         print(UPDATED_INITIAL_PROMPT[:500] + "...")
         
     except Exception as e:

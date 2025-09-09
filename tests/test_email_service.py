@@ -8,7 +8,7 @@ import sys
 import json
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from services.email_service import EmailService
+from ..services.email_service import EmailService
 
 def test_email_service():
     """

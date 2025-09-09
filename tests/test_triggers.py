@@ -4,8 +4,8 @@ Test script to show all email triggers and patterns
 """
 
 import re
-from services.email_service import EmailService
-from constants import CONTACTS
+from ..services.email_service import EmailService
+from ..agents.constants import CONTACTS
 
 def test_all_triggers():
     """Test all possible email trigger patterns"""
