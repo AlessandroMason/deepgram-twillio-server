@@ -6,6 +6,14 @@ import websockets
 import ssl
 import os
 from services.optimized_diary_service import OptimizedDiaryService
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+    print("✅ Loaded environment variables from .env file")
+except ImportError:
+    print("⚠️  python-dotenv not available, using system environment variables")
+from services.calendar_service import GoogleCalendarService
 #from services.email_service import EmailService
 from agents.constants import (
     INITIAL_PROMPT, 
@@ -28,6 +36,7 @@ from agents.constants_generic import (
 # Global service instances for caching across requests
 diary_service = None
 email_service = None
+calendar_service = None
 
 def get_diary_service():
     """
@@ -37,6 +46,19 @@ def get_diary_service():
     if diary_service is None:
         diary_service = OptimizedDiaryService()
     return diary_service
+
+def get_calendar_service():
+    """
+    Get or create the global calendar service instance
+    """
+    global calendar_service
+    if calendar_service is None:
+        try:
+            calendar_service = GoogleCalendarService()
+        except ValueError as e:
+            print(f"⚠️  Calendar service not available: {e}")
+            calendar_service = None
+    return calendar_service
 
 """ def get_email_service():
    
@@ -63,10 +85,10 @@ def sts_connect():
 
 def get_complete_prompt(use_personal=True):
     """
-    Get the complete prompt with diary data included immediately
+    Get the complete prompt with diary data and calendar events included immediately
     
     Args:
-        use_personal: If True, use personal prompt with diary data. If False, use generic prompt.
+        use_personal: If True, use personal prompt with diary data and calendar. If False, use generic prompt.
     """
     if use_personal:
         try:
@@ -81,19 +103,31 @@ def get_complete_prompt(use_personal=True):
                 max_chars=DIARY_MAX_CHARS
             )
             
-            # Combine initial prompt with diary data
+            # Get calendar events
+            calendar_section = ""
+            calendar_svc = get_calendar_service()
+            if calendar_svc:
+                calendar_section = calendar_svc.get_events_for_agent()
+            else:
+                calendar_section = "Calendar service not available."
+            
+            # Combine initial prompt with diary data and calendar events
             complete_prompt = f"""{INITIAL_PROMPT}
 
-{diary_section}"""
+{diary_section}
+
+{calendar_section}"""
             
             return complete_prompt
             
         except Exception as e:
-            print(f"Error fetching diary entries: {e}")
+            print(f"Error fetching diary entries or calendar events: {e}")
             # Fallback to static diary content if Firebase fails
             return f"""{INITIAL_PROMPT}
 
-{FALLBACK_DIARY}"""
+{FALLBACK_DIARY}
+
+Calendar service not available."""
     else:
         # Use generic prompt without personal data
         return INITIAL_PROMPT_GENERIC
@@ -252,12 +286,21 @@ def main():
     server = websockets.serve(router, "0.0.0.0", port)
     print(f"Server starting on ws://0.0.0.0:{port}")
     print("Available endpoints:")
-    print("  /twilio  - Personal assistant with diary data")
+    print("  /twilio  - Personal assistant with diary data and calendar events")
     print("  /generic - Public assistant promoting Alessandro")
     print("Using optimized diary service with aggressive caching")
     print("Diary data pre-loaded for instant access")
     print("Complete prompt sent immediately - no updates needed")
     print(f"Personal limits: {DIARY_DAYS} days, {DIARY_MAX_ENTRIES} entries max, {DIARY_MAX_CHARS} characters max")
+    
+    # Check if calendar service is available
+    calendar_svc = get_calendar_service()
+    if calendar_svc:
+        print("✅ Calendar service initialized - events cached and refreshed at midnight")
+        status = calendar_svc.get_service_status()
+        print(f"📅 Calendar status: {status['cached_events_count']} events cached, scheduler running: {status['scheduler_running']}")
+    else:
+        print("⚠️  Calendar service not available - set GMAIL_PASSWORD environment variable to enable")
     
     # Check if email service is available
     """ email_svc = get_email_service()

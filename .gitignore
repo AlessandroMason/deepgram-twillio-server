@@ -21,3 +21,8 @@ dist/
 build/
 poetry.lock
 new_path/
+# Google Calendar OAuth2 files
+credentials.json
+token.json
+# Google Calendar OAuth2 token file
+token.json
