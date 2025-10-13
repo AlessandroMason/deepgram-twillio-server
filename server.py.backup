@@ -6,8 +6,6 @@ import websockets
 import ssl
 import os
 from services.optimized_diary_service import OptimizedDiaryService
-from services.email_automation_service import EmailAutomationService
-
 # Load environment variables from .env file
 try:
     from dotenv import load_dotenv
@@ -39,7 +37,6 @@ from agents.constants_generic import (
 diary_service = None
 email_service = None
 calendar_service = None
-email_automation_service = None
 
 def get_diary_service():
     """
@@ -62,15 +59,6 @@ def get_calendar_service():
             print(f"⚠️  Calendar service not available: {e}")
             calendar_service = None
     return calendar_service
-
-def get_email_automation_service():
-    """
-    Get or create the global email automation service instance
-    """
-    global email_automation_service
-    if email_automation_service is None:
-        email_automation_service = EmailAutomationService()
-    return email_automation_service
 
 """ def get_email_service():
    
@@ -123,25 +111,12 @@ def get_complete_prompt(use_personal=True):
             else:
                 calendar_section = "Calendar service not available."
             
-            # Add email automation instructions to the prompt
-            email_instructions = """
-# Email Automation Instructions
-- If the user asks you to send an email, respond with a JSON object in this exact format:
-  {"to": "recipient@example.com", "subject": "Email Subject", "message": "Email content"}
-- The JSON must be valid and include all three fields: to, subject, and message
-- You can also use alternative field names: recipient/to, title/subject, body/message
-- If the JSON is invalid, you will be prompted to fix it
-- After sending, you will receive confirmation that the email was sent
-"""
-            
-            # Combine initial prompt with diary data, calendar events, and email instructions
+            # Combine initial prompt with diary data and calendar events
             complete_prompt = f"""{INITIAL_PROMPT}
 
 {diary_section}
 
-{calendar_section}
-
-{email_instructions}"""
+{calendar_section}"""
             
             return complete_prompt
             
@@ -152,15 +127,7 @@ def get_complete_prompt(use_personal=True):
 
 {FALLBACK_DIARY}
 
-Calendar service not available.
-
-# Email Automation Instructions
-- If the user asks you to send an email, respond with a JSON object in this exact format:
-  {"to": "recipient@example.com", "subject": "Email Subject", "message": "Email content"}
-- The JSON must be valid and include all three fields: to, subject, and message
-- You can also use alternative field names: recipient/to, title/subject, body/message
-- If the JSON is invalid, you will be prompted to fix it
-- After sending, you will receive confirmation that the email was sent"""
+Calendar service not available."""
     else:
         # Use generic prompt without personal data
         return INITIAL_PROMPT_GENERIC
@@ -226,50 +193,15 @@ async def twilio_handler(twilio_ws, use_personal=True):
                         clear_message = {"event": "clear", "streamSid": streamsid}
                         await twilio_ws.send(json.dumps(clear_message))
                     
-                    # Check for agent responses and handle email automation (only for personal endpoint)
+                    # Check for agent responses and trigger email if needed (only for personal endpoint)
                     if use_personal and decoded.get("type") == "AgentResponse":
                         agent_text = decoded.get("text", "")
                         if agent_text:
                             print(f"🤖 Agent response: {agent_text}")
-                            
-                            # Process email automation
-                            email_automation = get_email_automation_service()
-                            has_email, injection_prompt, email_request = await email_automation.process_agent_response(agent_text)
-                            
-                            if has_email:
-                                if email_request:
-                                    # Valid email request - send the email
-                                    print(f"📧 Sending email to: {email_request.to}")
-                                    success, message = await email_automation.send_email(email_request)
-                                    
-                                    if success:
-                                        print(f"✅ Email sent successfully: {message}")
-                                        # Inject confirmation back to agent
-                                        confirmation = email_automation.create_success_confirmation_prompt(email_request)
-                                        inject_message = {
-                                            "type": "InjectUserMessage",
-                                            "content": confirmation
-                                        }
-                                        await sts_ws.send(json.dumps(inject_message))
-                                        print(f"📤 Injected confirmation: {confirmation}")
-                                    else:
-                                        print(f"❌ Email sending failed: {message}")
-                                        # Inject error message
-                                        error_message = f"Email sending failed: {message}. Please try again."
-                                        inject_message = {
-                                            "type": "InjectUserMessage",
-                                            "content": error_message
-                                        }
-                                        await sts_ws.send(json.dumps(inject_message))
-                                else:
-                                    # Invalid email request - inject correction prompt
-                                    print(f"❌ Invalid email request, injecting correction prompt")
-                                    inject_message = {
-                                        "type": "InjectUserMessage",
-                                        "content": injection_prompt
-                                    }
-                                    await sts_ws.send(json.dumps(inject_message))
-                                    print(f"📤 Injected correction prompt: {injection_prompt}")
+                            # Check if email service is available and trigger email
+                            """ email_svc = get_email_service()
+                            if email_svc:
+                                email_svc.check_and_trigger_email(agent_text) """
                     
                     continue
  
@@ -354,7 +286,7 @@ def main():
     server = websockets.serve(router, "0.0.0.0", port)
     print(f"Server starting on ws://0.0.0.0:{port}")
     print("Available endpoints:")
-    print("  /twilio  - Personal assistant with diary data, calendar events, and email automation")
+    print("  /twilio  - Personal assistant with diary data and calendar events")
     print("  /generic - Public assistant promoting Alessandro")
     print("Using optimized diary service with aggressive caching")
     print("Diary data pre-loaded for instant access")
@@ -369,15 +301,6 @@ def main():
         print(f"📅 Calendar status: {status['cached_events_count']} events cached, scheduler running: {status['scheduler_running']}")
     else:
         print("⚠️  Calendar service not available - set GMAIL_PASSWORD environment variable to enable")
-    
-    # Check if email automation service is available
-    email_automation = get_email_automation_service()
-    print("✅ Email automation service initialized - JSON validation and n8n webhook integration ready")
-    print("📧 Email automation features:")
-    print("  - JSON validation using Guardrails AI")
-    print("  - Automatic email sending via n8n webhook")
-    print("  - Agent injection for corrections and confirmations")
-    print("  - Support for alternative field names (recipient/to, title/subject, body/message)")
     
     # Check if email service is available
     """ email_svc = get_email_service()
