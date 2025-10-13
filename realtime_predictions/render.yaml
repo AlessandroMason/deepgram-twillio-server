@@ -1,0 +1,20 @@
+services:
+  # Real-time Behavior Prediction API Service
+  - type: web
+    name: behavior-prediction-api
+    env: docker
+    region: oregon  # Change to your preferred region
+    plan: starter  # Free tier - upgrade to standard for production
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: PYTHON_VERSION
+        value: 3.9
+      - key: MODEL_PATH
+        value: models/realtime_behavior_model.pkl
+      - key: DATA_PATH
+        value: data/firestore_data.csv
+    # Auto-deploy when you push to main branch
+    autoDeploy: true
+

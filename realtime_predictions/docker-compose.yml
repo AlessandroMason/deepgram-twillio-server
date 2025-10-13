@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  behavior-prediction-api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+    environment:
+      - MODEL_PATH=models/realtime_behavior_model.pkl
+      - DATA_PATH=data/firestore_data.csv
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+
