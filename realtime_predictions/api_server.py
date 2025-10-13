@@ -14,10 +14,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import uvicorn
 
-# Add services directory to path
-sys.path.append(os.path.join(os.path.dirname(__file__), 'services'))
+# Add parent directory to path to find services
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, current_dir)
 
-from services.predictor import RealtimeBehaviorPredictor
+# Import from services subdirectory
+try:
+    from services.predictor import RealtimeBehaviorPredictor
+except ImportError:
+    # If running from parent directory, try alternative import
+    sys.path.insert(0, os.path.join(current_dir, '..'))
+    from realtime_predictions.services.predictor import RealtimeBehaviorPredictor
 
 # Initialize FastAPI app
 app = FastAPI(
