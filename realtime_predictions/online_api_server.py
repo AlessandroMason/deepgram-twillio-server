@@ -212,13 +212,29 @@ async def predict_next_entry(request: PredictRequest):
         # Make prediction
         prediction = predictor.predict_next_entry(recent_entries)
         
+        # Ensure top_predictions is properly formatted
+        top_preds = []
+        for item in prediction['top_predictions']:
+            if isinstance(item, tuple):
+                action, prob = item
+            else:
+                action = item.get('action', 'Unknown')
+                prob = item.get('probability', 0.0)
+            
+            # Convert numpy types to Python native types
+            if hasattr(action, 'item'):
+                action = action.item()
+            if hasattr(prob, 'item'):
+                prob = float(prob.item())
+            else:
+                prob = float(prob)
+            
+            top_preds.append({"action": str(action), "probability": prob})
+        
         return PredictionResponse(
-            predicted_action=prediction['predicted_action'],
-            confidence=prediction['confidence'],
-            top_predictions=[
-                {"action": action, "probability": prob} 
-                for action, prob in prediction['top_predictions']
-            ],
+            predicted_action=str(prediction['predicted_action']),
+            confidence=float(prediction['confidence']),
+            top_predictions=top_preds,
             timestamp=prediction['timestamp'],
             total_learned=prediction['total_learned'],
             predictions_made=prediction['predictions_made']
