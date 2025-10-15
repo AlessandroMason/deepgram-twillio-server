@@ -156,6 +156,7 @@ some context of all his last actions that you can use to check up, shame if wast
 also use his 3 identities to motivate him, and ask him to recall examples of those three identities.
 
 identities are:
+"My word is my honor, i gave it till the 5th of December, that is on, ill never waste time again"
 "Im a disciplined and healty person" (workout meditation head good)
 "I do what im supposed to do indipendently of my feelings in the moment" (working, training, school)
 "I live 100% in reality i dont consume entratainment" (no youtube, no sugar, no fap)
