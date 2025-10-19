@@ -134,9 +134,8 @@ class ReminderService:
             # Format the time nicely
             formatted_time = event_start.strftime("%I:%M %p")
             
-            # Connect directly to /twilio endpoint (same as regular calls)
-            # This is the simplest approach - just use the working endpoint
-            server_url = os.getenv("REMINDER_WEBSOCKET_URL", "wss://deepgram-twillio-server.onrender.com/twilio")
+            # Always use /twilio endpoint - proven to work!
+            server_url = "wss://deepgram-twillio-server.onrender.com/twilio"
             
             # Simple TwiML - just connect to Kayros AI
             twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
