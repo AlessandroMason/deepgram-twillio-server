@@ -134,20 +134,15 @@ class ReminderService:
             # Format the time nicely
             formatted_time = event_start.strftime("%I:%M %p")
             
-            # Get server URL from environment or use default
-            server_url = os.getenv("REMINDER_WEBSOCKET_URL", "wss://deepgram-twillio-server.onrender.com/reminder")
+            # Connect directly to /twilio endpoint (same as regular calls)
+            # This is the simplest approach - just use the working endpoint
+            server_url = os.getenv("REMINDER_WEBSOCKET_URL", "wss://deepgram-twillio-server.onrender.com/twilio")
             
-            # Create TwiML that connects directly to Kayros AI
-            # Pass event info as URL parameters - Kayros will announce it in his greeting
-            # Properly URL-encode all parameters
-            encoded_event_name = quote(event_name, safe='')
-            encoded_event_time = quote(formatted_time, safe='')
-            encoded_event_id = quote(event_id, safe='')
-            
+            # Simple TwiML - just connect to Kayros AI
             twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Connect>
-        <Stream url="{server_url}?event_name={encoded_event_name}&event_time={encoded_event_time}&event_id={encoded_event_id}&advance_minutes={self.advance_minutes}" />
+        <Stream url="{server_url}" />
     </Connect>
 </Response>"""
             
@@ -158,11 +153,10 @@ class ReminderService:
                 from_=self.twilio_phone_number
             )
             
-            print(f"✅ Reminder call initiated with Kayros AI: SID={call.sid}")
-            print(f"   Event: {event_name}")
-            print(f"   Time: {formatted_time}")
-            print(f"   To: {self.phone_number}")
-            print(f"   Kayros will announce in greeting, then provide full context")
+            print(f"✅ Reminder call initiated: SID={call.sid}")
+            print(f"   Event: {event_name} at {formatted_time}")
+            print(f"   Calling: {self.phone_number}")
+            print(f"   Kayros will answer with his normal greeting")
             
             return call.sid
             

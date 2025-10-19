@@ -329,23 +329,9 @@ async def router(websocket, path):
         print("Starting generic Twilio handler")
         await twilio_handler(websocket, use_personal=False)
     elif base_path == "/reminder":
-        # Parse event information from query parameters
-        event_info = None
-        if query_string:
-            from urllib.parse import parse_qs
-            params = parse_qs(query_string)
-            event_info = {
-                "name": params.get("event_name", ["Unknown event"])[0],
-                "time": params.get("event_time", ["Unknown time"])[0],
-                "id": params.get("event_id", [""])[0],
-                "advance_minutes": params.get("advance_minutes", ["10"])[0]
-            }
-            print(f"📞 Starting reminder call for event: {event_info['name']} at {event_info['time']}")
-        else:
-            print("⚠️  Reminder call without event info - using default")
-        
-        # Use the same handler as /twilio, just with event context
-        await twilio_handler(websocket, use_personal=True, reminder_event=event_info)
+        # Simplified: just connect to the same working /twilio handler
+        print("📞 Starting reminder call - connecting to Kayros AI")
+        await twilio_handler(websocket, use_personal=True)
     else:
         print(f"Unknown path: {path}")
         await websocket.close()
