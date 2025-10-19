@@ -58,7 +58,8 @@ class GoogleCalendarService:
         
         # OAuth2 setup
         # Use /tmp for files on Render (writable), fallback to local paths
-        is_render = os.getenv("RENDER")
+        # Render sets RENDER_SERVICE_ID, so check for that
+        is_render = os.getenv("RENDER_SERVICE_ID") is not None or os.getenv("RENDER") is not None
         default_creds_path = "/tmp/credentials.json" if is_render else "credentials.json"
         default_token_path = "/tmp/token.json" if is_render else "token.json"
         
