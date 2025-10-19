@@ -192,26 +192,39 @@ def main():
     while True:
         print_section("📋 Test Menu")
         print("\nWhat would you like to test?")
-        print("  1. Send a test reminder call now")
-        print("  2. Monitor for upcoming events (60 seconds)")
-        print("  3. Check service status")
-        print("  4. Exit")
+        print("  1. Send a test reminder call now (uses /reminder endpoint)")
+        print("  2. Send test call to /twilio endpoint (bypass reminder logic)")
+        print("  3. Monitor for upcoming events (60 seconds)")
+        print("  4. Check service status")
+        print("  5. Exit")
         
-        choice = input("\nEnter your choice (1-4): ").strip()
+        choice = input("\nEnter your choice (1-5): ").strip()
         
         if choice == "1":
             send_test_call(reminder_service)
         elif choice == "2":
-            monitor_upcoming_events(reminder_service, duration_seconds=60)
+            # Test with /twilio endpoint
+            print_section("🧪 Testing with /twilio Endpoint")
+            print("\n📞 This bypasses reminder logic and connects directly to Kayros")
+            print("   If this works but option 1 doesn't, the issue is with /reminder endpoint")
+            print()
+            response = input("⚠️  Make test call to /twilio? (yes/no): ").strip().lower()
+            if response in ['yes', 'y']:
+                try:
+                    reminder_service.test_reminder_call(use_twilio_endpoint=True)
+                except Exception as e:
+                    print(f"❌ Error: {e}")
         elif choice == "3":
+            monitor_upcoming_events(reminder_service, duration_seconds=60)
+        elif choice == "4":
             print("\n📊 Calendar Service Status:")
             print(json.dumps(calendar_service.get_service_status(), indent=2))
             print("\n📊 Reminder Service Status:")
             print(json.dumps(reminder_service.get_service_status(), indent=2))
-        elif choice == "4":
+        elif choice == "5":
             break
         else:
-            print("❌ Invalid choice. Please enter 1, 2, 3, or 4.")
+            print("❌ Invalid choice. Please enter 1, 2, 3, 4, or 5.")
     
     # Cleanup
     print_section("🧹 Cleanup")

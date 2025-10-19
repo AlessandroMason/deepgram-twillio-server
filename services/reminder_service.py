@@ -164,32 +164,59 @@ class ReminderService:
             print(f"❌ Error sending reminder call: {e}")
             return None
     
-    def test_reminder_call(self, test_message: str = None):
+    def test_reminder_call(self, test_message: str = None, use_twilio_endpoint=False):
         """
         Send a test reminder call immediately (for testing purposes)
         Connects to Kayros AI like a real reminder
         
         Args:
             test_message: Custom message to speak (optional)
+            use_twilio_endpoint: If True, connect to /twilio instead of /reminder for testing
         """
         try:
-            # Create a fake test event
-            test_event = {
-                "id": "test-event-" + str(int(time.time())),
-                "summary": "Test Event",
-                "start": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
-                "end": (datetime.now(timezone.utc) + timedelta(minutes=11)).isoformat()
-            }
-            
-            # Use the real reminder call method
-            call_sid = self._send_reminder_call(test_event)
-            
-            if call_sid:
-                print(f"✅ Test reminder call sent successfully!")
-                print(f"   This is a REAL reminder call that connects to Kayros AI")
-                print(f"   You can talk to the AI after the initial announcement")
-            
-            return call_sid
+            if use_twilio_endpoint:
+                # TEST MODE: Connect directly to /twilio endpoint (bypasses reminder logic)
+                print("🧪 TEST MODE: Connecting to /twilio endpoint directly")
+                server_url = "wss://deepgram-twillio-server.onrender.com/twilio"
+                
+                twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Connect>
+        <Stream url="{server_url}" />
+    </Connect>
+</Response>"""
+                
+                call = self.twilio_client.calls.create(
+                    twiml=twiml,
+                    to=self.phone_number,
+                    from_=self.twilio_phone_number
+                )
+                
+                print(f"✅ Test call initiated (connecting to /twilio)!")
+                print(f"   Call SID: {call.sid}")
+                print(f"   This tests if outbound calls work at all")
+                print(f"   You should hear: 'Hi Alessandro! Kayros here.'")
+                
+                return call.sid
+            else:
+                # NORMAL MODE: Use reminder endpoint
+                # Create a fake test event
+                test_event = {
+                    "id": "test-event-" + str(int(time.time())),
+                    "summary": "Test Event",
+                    "start": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(),
+                    "end": (datetime.now(timezone.utc) + timedelta(minutes=11)).isoformat()
+                }
+                
+                # Use the real reminder call method
+                call_sid = self._send_reminder_call(test_event)
+                
+                if call_sid:
+                    print(f"✅ Test reminder call sent successfully!")
+                    print(f"   This is a REAL reminder call that connects to Kayros AI")
+                    print(f"   You can talk to the AI after the initial announcement")
+                
+                return call_sid
             
         except Exception as e:
             print(f"❌ Error sending test call: {e}")

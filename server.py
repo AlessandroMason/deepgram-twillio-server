@@ -216,7 +216,7 @@ async def twilio_handler(twilio_ws, use_personal=True, reminder_event=None):
                 },
                 "listen": {"provider": {"type": "deepgram", "model": "nova-3"}},
                 "think": {
-                    "provider": {"type": "open_ai", "model": "gpt-4o"},
+                    "provider": {"type": "open_ai", "model": "gpt-4.1"},
                     "prompt": complete_prompt,
                 },
                 "greeting": greeting,
@@ -330,7 +330,7 @@ async def router(websocket, path):
         await twilio_handler(websocket, use_personal=False)
     elif base_path == "/reminder":
         # Parse event information from query parameters
-        event_info = {}
+        event_info = None
         if query_string:
             from urllib.parse import parse_qs
             params = parse_qs(query_string)
@@ -340,8 +340,11 @@ async def router(websocket, path):
                 "id": params.get("event_id", [""])[0],
                 "advance_minutes": params.get("advance_minutes", ["10"])[0]
             }
+            print(f"📞 Starting reminder call for event: {event_info['name']} at {event_info['time']}")
+        else:
+            print("⚠️  Reminder call without event info - using default")
         
-        print(f"Starting reminder call for event: {event_info.get('name', 'Unknown')} at {event_info.get('time', 'Unknown')}")
+        # Use the same handler as /twilio, just with event context
         await twilio_handler(websocket, use_personal=True, reminder_event=event_info)
     else:
         print(f"Unknown path: {path}")
