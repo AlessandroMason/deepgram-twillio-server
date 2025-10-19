@@ -57,8 +57,13 @@ class GoogleCalendarService:
         self.refresh_interval_minutes = refresh_interval_minutes or int(os.getenv("CALENDAR_REFRESH_MINUTES", "0"))
         
         # OAuth2 setup
-        self.credentials_file = os.getenv("GOOGLE_CALENDAR_CREDENTIALS_FILE", "credentials.json")
-        self.token_file = os.getenv("GOOGLE_TOKEN_FILE", "token.json")
+        # Use /tmp for files on Render (writable), fallback to local paths
+        is_render = os.getenv("RENDER")
+        default_creds_path = "/tmp/credentials.json" if is_render else "credentials.json"
+        default_token_path = "/tmp/token.json" if is_render else "token.json"
+        
+        self.credentials_file = os.getenv("GOOGLE_CALENDAR_CREDENTIALS_FILE", default_creds_path)
+        self.token_file = os.getenv("GOOGLE_TOKEN_FILE", default_token_path)
         self.service = None
         
         # Initialize the service
@@ -88,9 +93,27 @@ class GoogleCalendarService:
     
     def _build_calendar_from_token(self):
         """Build Google Calendar service from refresh token"""
-        if not os.path.exists(self.token_file):
+        # Check if token is in environment variable (for Render deployment)
+        token_json_env = os.getenv("GOOGLE_TOKEN_JSON")
+        
+        if token_json_env:
+            print("📋 Using token from GOOGLE_TOKEN_JSON environment variable")
+            try:
+                data = json.loads(token_json_env)
+                # Write to temp file so it can be updated when refreshed
+                with open(self.token_file, 'w') as f:
+                    json.dump(data, f)
+                print(f"✅ Token written to {self.token_file}")
+            except json.JSONDecodeError as e:
+                print(f"❌ Error parsing GOOGLE_TOKEN_JSON: {e}")
+                return None
+            except Exception as e:
+                print(f"❌ Error writing token file: {e}")
+                return None
+        elif not os.path.exists(self.token_file):
             print(f"❌ Token file not found: {self.token_file}")
             print("📋 Please run setup_oauth2_token.py to generate refresh token")
+            print("📋 Or set GOOGLE_TOKEN_JSON environment variable with token contents")
             return None
         
         try:
