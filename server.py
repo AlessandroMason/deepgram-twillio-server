@@ -15,6 +15,7 @@ try:
 except ImportError:
     print("⚠️  python-dotenv not available, using system environment variables")
 from services.calendar_service import GoogleCalendarService
+from services.reminder_service import ReminderService
 #from services.email_service import EmailService
 from agents.constants import (
     INITIAL_PROMPT, 
@@ -37,6 +38,7 @@ from agents.constants_generic import (
 # Global service instances for caching across requests
 diary_service = None
 calendar_service = None
+reminder_service = None
 
 def get_diary_service():
     """
@@ -54,11 +56,44 @@ def get_calendar_service():
     global calendar_service
     if calendar_service is None:
         try:
-            calendar_service = GoogleCalendarService()
+            # Get refresh interval from environment (default: 5 minutes for reminders to work well)
+            refresh_minutes = int(os.getenv("CALENDAR_REFRESH_MINUTES", "5"))
+            calendar_service = GoogleCalendarService(refresh_interval_minutes=refresh_minutes)
         except ValueError as e:
             print(f"⚠️  Calendar service not available: {e}")
             calendar_service = None
     return calendar_service
+
+def get_reminder_service():
+    """
+    Get or create the global reminder service instance
+    """
+    global reminder_service
+    if reminder_service is None:
+        calendar_svc = get_calendar_service()
+        if calendar_svc is None:
+            print("⚠️  Reminder service not available: calendar service required")
+            return None
+        
+        try:
+            # Get configuration from environment
+            phone_number = os.getenv("REMINDER_PHONE_NUMBER", "+12162589844")
+            advance_minutes = int(os.getenv("REMINDER_ADVANCE_MINUTES", "10"))
+            check_interval = int(os.getenv("REMINDER_CHECK_INTERVAL_SECONDS", "30"))
+            
+            reminder_service = ReminderService(
+                calendar_service=calendar_svc,
+                phone_number=phone_number,
+                advance_minutes=advance_minutes,
+                check_interval_seconds=check_interval
+            )
+        except ValueError as e:
+            print(f"⚠️  Reminder service not available: {e}")
+            reminder_service = None
+        except Exception as e:
+            print(f"⚠️  Reminder service initialization failed: {e}")
+            reminder_service = None
+    return reminder_service
 
 
 def sts_connect():
@@ -73,12 +108,13 @@ def sts_connect():
     return sts_ws
 
 
-def get_complete_prompt(use_personal=True):
+def get_complete_prompt(use_personal=True, reminder_event=None):
     """
     Get the complete prompt with diary data and calendar events included immediately
     
     Args:
         use_personal: If True, use personal prompt with diary data and calendar. If False, use generic prompt.
+        reminder_event: If provided, adds context about the upcoming event (for reminder calls)
     """
     if use_personal:
         try:
@@ -101,12 +137,32 @@ def get_complete_prompt(use_personal=True):
             else:
                 calendar_section = "Calendar service not available."
             
-            # Combine initial prompt with diary data and calendar events
+            # Add reminder event context if this is a reminder call
+            reminder_context = ""
+            if reminder_event:
+                event_name = reminder_event.get("name", "Unknown event")
+                event_time = reminder_event.get("time", "Unknown time")
+                advance_min = reminder_event.get("advance_minutes", "10")
+                
+                # Get all upcoming events for additional context
+                all_events = calendar_section if calendar_section != "Calendar service not available." else "No other events available."
+                
+                reminder_context = f"""
+IMPORTANT CONTEXT - THIS IS A REMINDER CALL:
+- You are calling Alessandro to remind him about: "{event_name}" starting at {event_time} (in {advance_min} minutes)
+- You already announced this in your greeting
+- Be helpful - ask if he needs anything, if he's prepared, or wants to discuss the event
+- Here are his other upcoming events for context: {all_events}
+- Keep responses focused and concise unless he wants to chat more"""
+            
+            # Combine initial prompt with diary data, calendar events, and optional reminder context
             complete_prompt = f"""{INITIAL_PROMPT}
 
 {diary_section}
 
-{calendar_section}"""
+{calendar_section}
+
+{reminder_context}"""
             
             return complete_prompt
             
@@ -123,14 +179,22 @@ Calendar service not available."""
         return INITIAL_PROMPT_GENERIC
 
 
-async def twilio_handler(twilio_ws, use_personal=True):
+async def twilio_handler(twilio_ws, use_personal=True, reminder_event=None):
     audio_queue = asyncio.Queue()
     streamsid_queue = asyncio.Queue()
 
     async with sts_connect() as sts_ws:
         # Get complete prompt based on endpoint type
-        complete_prompt = get_complete_prompt(use_personal)
-        greeting = GREETING if use_personal else GREETING_GENERIC
+        complete_prompt = get_complete_prompt(use_personal, reminder_event=reminder_event)
+        
+        # For reminder calls, Kayros announces the event in his greeting
+        if reminder_event:
+            event_name = reminder_event.get("name", "Unknown event")
+            event_time = reminder_event.get("time", "Unknown time")
+            advance_min = reminder_event.get("advance_minutes", "10")
+            greeting = f"Hey Alessandro, Kayros here. Quick reminder: you have {event_name} starting at {event_time} in {advance_min} minutes."
+        else:
+            greeting = GREETING if use_personal else GREETING_GENERIC
         
         # Configuration with complete prompt from the start
         config_message = {
@@ -250,12 +314,35 @@ async def twilio_handler(twilio_ws, use_personal=True):
 
 async def router(websocket, path):
     print(f"Incoming connection on path: {path}")
-    if path == "/twilio":
+    
+    # Parse path and query parameters
+    if "?" in path:
+        base_path, query_string = path.split("?", 1)
+    else:
+        base_path = path
+        query_string = ""
+    
+    if base_path == "/twilio":
         print("Starting personal Twilio handler")
         await twilio_handler(websocket, use_personal=True)
-    elif path == "/generic":
+    elif base_path == "/generic":
         print("Starting generic Twilio handler")
         await twilio_handler(websocket, use_personal=False)
+    elif base_path == "/reminder":
+        # Parse event information from query parameters
+        event_info = {}
+        if query_string:
+            from urllib.parse import parse_qs
+            params = parse_qs(query_string)
+            event_info = {
+                "name": params.get("event_name", ["Unknown event"])[0],
+                "time": params.get("event_time", ["Unknown time"])[0],
+                "id": params.get("event_id", [""])[0],
+                "advance_minutes": params.get("advance_minutes", ["10"])[0]
+            }
+        
+        print(f"Starting reminder call for event: {event_info.get('name', 'Unknown')} at {event_info.get('time', 'Unknown')}")
+        await twilio_handler(websocket, use_personal=True, reminder_event=event_info)
     else:
         print(f"Unknown path: {path}")
         await websocket.close()
@@ -268,6 +355,7 @@ def main():
     print("Available endpoints:")
     print("  /twilio  - Personal assistant with diary data, calendar events, and email automation")
     print("  /generic - Public assistant promoting Alessandro")
+    print("  /reminder - Reminder calls that connect to Kayros AI (used by reminder service)")
     print("Using optimized diary service with aggressive caching")
     print("Diary data pre-loaded for instant access")
     print("Complete prompt sent immediately - no updates needed")
@@ -276,11 +364,21 @@ def main():
     # Check if calendar service is available
     calendar_svc = get_calendar_service()
     if calendar_svc:
-        print("✅ Calendar service initialized - events cached and refreshed at midnight")
         status = calendar_svc.get_service_status()
+        refresh_info = f"every {status['refresh_interval_minutes']} minutes" if status['refresh_mode'] == 'periodic' else "at midnight"
+        print(f"✅ Calendar service initialized - events refreshed {refresh_info}")
         print(f"📅 Calendar status: {status['cached_events_count']} events cached, scheduler running: {status['scheduler_running']}")
     else:
         print("⚠️  Calendar service not available - set GMAIL_PASSWORD environment variable to enable")
+    
+    # Check if reminder service is available
+    reminder_svc = get_reminder_service()
+    if reminder_svc:
+        status = reminder_svc.get_service_status()
+        print("✅ Reminder service initialized - automated calls enabled")
+        print(f"📞 Reminder status: calling {status['phone_number']} {status['advance_minutes']} minutes before events")
+    else:
+        print("⚠️  Reminder service not available - requires calendar service and Twilio credentials")
     loop = asyncio.get_event_loop()
     loop.run_until_complete(server)
     loop.run_forever()

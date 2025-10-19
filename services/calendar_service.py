@@ -32,13 +32,15 @@ class GoogleCalendarService:
     Falls back to Gmail IMAP for authentication testing.
     """
     
-    def __init__(self, gmail_email: str = "axm2022@case.edu", gmail_password: str = None):
+    def __init__(self, gmail_email: str = "axm2022@case.edu", gmail_password: str = None, refresh_interval_minutes: int = None):
         """
         Initialize Google Calendar service with OAuth2 refresh token
         
         Args:
             gmail_email: Gmail email address
             gmail_password: Gmail app password (if None, will use GMAIL_PASSWORD env var)
+            refresh_interval_minutes: How often to refresh calendar (default: None for midnight-only refresh,
+                                     or specify minutes like 5, 10, 15 for periodic refresh)
         """
         if gmail_password is None:
             gmail_password = os.getenv("GMAIL_PASSWORD")
@@ -52,6 +54,7 @@ class GoogleCalendarService:
         self.last_refresh = None
         self.refresh_thread = None
         self.running = False
+        self.refresh_interval_minutes = refresh_interval_minutes or int(os.getenv("CALENDAR_REFRESH_MINUTES", "0"))
         
         # OAuth2 setup
         self.credentials_file = os.getenv("GOOGLE_CALENDAR_CREDENTIALS_FILE", "credentials.json")
@@ -137,12 +140,17 @@ class GoogleCalendarService:
             return False
     
     def _start_midnight_scheduler(self):
-        """Start the midnight refresh scheduler"""
+        """Start the refresh scheduler (either periodic or midnight-only)"""
         if self.refresh_thread is None or not self.refresh_thread.is_alive():
             self.running = True
-            self.refresh_thread = threading.Thread(target=self._midnight_refresh_loop, daemon=True)
-            self.refresh_thread.start()
-            print("🕛 Started midnight refresh scheduler")
+            if self.refresh_interval_minutes > 0:
+                self.refresh_thread = threading.Thread(target=self._periodic_refresh_loop, daemon=True)
+                self.refresh_thread.start()
+                print(f"🔄 Started periodic refresh scheduler (every {self.refresh_interval_minutes} minutes)")
+            else:
+                self.refresh_thread = threading.Thread(target=self._midnight_refresh_loop, daemon=True)
+                self.refresh_thread.start()
+                print("🕛 Started midnight refresh scheduler")
     
     def _midnight_refresh_loop(self):
         """Background thread that refreshes calendar events at midnight"""
@@ -163,6 +171,25 @@ class GoogleCalendarService:
             except Exception as e:
                 print(f"❌ Error in midnight refresh loop: {e}")
                 time.sleep(3600)  # Sleep for 1 hour on error
+    
+    def _periodic_refresh_loop(self):
+        """Background thread that refreshes calendar events periodically"""
+        # Do an initial refresh immediately
+        self.refresh_events()
+        
+        while self.running:
+            try:
+                sleep_seconds = self.refresh_interval_minutes * 60
+                print(f"⏰ Next calendar refresh in {self.refresh_interval_minutes} minutes")
+                time.sleep(sleep_seconds)
+                
+                if self.running:
+                    print(f"🔄 Refreshing calendar events (periodic: {self.refresh_interval_minutes}min interval)...")
+                    self.refresh_events()
+                    
+            except Exception as e:
+                print(f"❌ Error in periodic refresh loop: {e}")
+                time.sleep(300)  # Sleep for 5 minutes on error
     
     def refresh_events(self):
         """Refresh cached calendar events from Google Calendar API"""
@@ -346,11 +373,14 @@ class GoogleCalendarService:
         Returns:
             Dictionary with service status information
         """
+        refresh_mode = "periodic" if self.refresh_interval_minutes > 0 else "midnight-only"
         return {
             "initialized": self.service is not None,
             "cached_events_count": len(self.cached_events),
             "last_refresh": self.last_refresh.isoformat() if self.last_refresh else None,
             "scheduler_running": self.running and self.refresh_thread and self.refresh_thread.is_alive(),
+            "refresh_mode": refresh_mode,
+            "refresh_interval_minutes": self.refresh_interval_minutes if self.refresh_interval_minutes > 0 else None,
             "gmail_email": self.gmail_email,
             "authentication_method": "Google Calendar API (OAuth2 Refresh Token)" if self.service else "Gmail IMAP (fallback)",
             "credentials_file": self.credentials_file,
