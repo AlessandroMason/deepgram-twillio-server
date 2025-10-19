@@ -12,6 +12,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Set, Optional
 from twilio.rest import Client
+from urllib.parse import quote
 
 class ReminderService:
     """
@@ -138,10 +139,15 @@ class ReminderService:
             
             # Create TwiML that connects directly to Kayros AI
             # Pass event info as URL parameters - Kayros will announce it in his greeting
+            # Properly URL-encode all parameters
+            encoded_event_name = quote(event_name, safe='')
+            encoded_event_time = quote(formatted_time, safe='')
+            encoded_event_id = quote(event_id, safe='')
+            
             twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Connect>
-        <Stream url="{server_url}?event_name={event_name.replace(' ', '%20')}&event_time={formatted_time.replace(' ', '%20')}&event_id={event_id}&advance_minutes={self.advance_minutes}" />
+        <Stream url="{server_url}?event_name={encoded_event_name}&event_time={encoded_event_time}&event_id={encoded_event_id}&advance_minutes={self.advance_minutes}" />
     </Connect>
 </Response>"""
             
