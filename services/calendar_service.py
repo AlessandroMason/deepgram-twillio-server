@@ -60,11 +60,28 @@ class GoogleCalendarService:
         # Use /tmp for files on Render (writable), fallback to local paths
         # Render sets RENDER_SERVICE_ID, so check for that
         is_render = os.getenv("RENDER_SERVICE_ID") is not None or os.getenv("RENDER") is not None
-        default_creds_path = "/tmp/credentials.json" if is_render else "credentials.json"
-        default_token_path = "/tmp/token.json" if is_render else "token.json"
         
-        self.credentials_file = os.getenv("GOOGLE_CALENDAR_CREDENTIALS_FILE", default_creds_path)
-        self.token_file = os.getenv("GOOGLE_TOKEN_FILE", default_token_path)
+        # Get token file path - if on Render and pointing to read-only /etc/secrets, override to /tmp
+        token_path_env = os.getenv("GOOGLE_TOKEN_FILE")
+        if is_render and token_path_env and token_path_env.startswith("/etc/secrets"):
+            # Force /tmp on Render if env var points to read-only location
+            self.token_file = "/tmp/token.json"
+            print(f"⚠️  Overriding GOOGLE_TOKEN_FILE from {token_path_env} to /tmp/token.json (read-only filesystem)")
+        elif is_render:
+            self.token_file = token_path_env or "/tmp/token.json"
+        else:
+            self.token_file = token_path_env or "token.json"
+        
+        # Same for credentials
+        creds_path_env = os.getenv("GOOGLE_CALENDAR_CREDENTIALS_FILE")
+        if is_render and creds_path_env and creds_path_env.startswith("/etc/secrets"):
+            self.credentials_file = "/tmp/credentials.json"
+            print(f"⚠️  Overriding GOOGLE_CALENDAR_CREDENTIALS_FILE from {creds_path_env} to /tmp/credentials.json")
+        elif is_render:
+            self.credentials_file = creds_path_env or "/tmp/credentials.json"
+        else:
+            self.credentials_file = creds_path_env or "credentials.json"
+        
         self.service = None
         
         # Initialize the service
