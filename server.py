@@ -216,7 +216,7 @@ async def twilio_handler(twilio_ws, use_personal=True, reminder_event=None):
                 },
                 "listen": {"provider": {"type": "deepgram", "model": "nova-3"}},
                 "think": {
-                    "provider": {"type": "open_ai", "model": "gpt-4.1"},
+                    "provider": {"type": "anthropic", "model": "claude-3-5-haiku-latest"},
                     "prompt": complete_prompt,
                 },
                 "greeting": greeting,
