@@ -360,14 +360,15 @@ def main():
     else:
         print("⚠️  Calendar service not available - set GMAIL_PASSWORD environment variable to enable")
     
-    # Check if reminder service is available
-    reminder_svc = get_reminder_service()
-    if reminder_svc:
-        status = reminder_svc.get_service_status()
-        print("✅ Reminder service initialized - automated calls enabled")
-        print(f"📞 Reminder status: calling {status['phone_number']} {status['advance_minutes']} minutes before events")
-    else:
-        print("⚠️  Reminder service not available - requires calendar service and Twilio credentials")
+    #! this calls the reminder service's constructuor and the constructor immeditely
+    #! starts the monitoring loop in the background so this basically stops the calls
+    # reminder_svc = get_reminder_service()
+    # if reminder_svc:
+    #     status = reminder_svc.get_service_status()
+    #     print("✅ Reminder service initialized - automated calls enabled")
+    #     print(f"📞 Reminder status: calling {status['phone_number']} {status['advance_minutes']} minutes before events")
+    # else:
+    #     print("⚠️  Reminder service not available - requires calendar service and Twilio credentials")
     loop = asyncio.get_event_loop()
     loop.run_until_complete(server)
     loop.run_forever()

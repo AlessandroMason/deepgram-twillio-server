@@ -127,6 +127,11 @@ class ReminderService:
             event: Event dictionary with summary, start, end
         """
         try:
+            # Feature flag to disable real phone calls
+            if os.getenv("DISABLE_CALLS", "").strip().lower() in {"1", "true", "yes", "on"}:
+                print("🚫 DISABLE_CALLS is set — skipping outbound reminder call")
+                return None
+
             event_name = event.get("summary", "Unnamed event")
             event_start = datetime.fromisoformat(event["start"].replace('Z', '+00:00'))
             event_id = event.get("id", "")
@@ -173,6 +178,11 @@ class ReminderService:
             use_twilio_endpoint: If True, connect to /twilio instead of /reminder for testing
         """
         try:
+            # Feature flag to disable real phone calls
+            if os.getenv("DISABLE_CALLS", "").strip().lower() in {"1", "true", "yes", "on"}:
+                print("🚫 DISABLE_CALLS is set — skipping test call")
+                return None
+
             if use_twilio_endpoint:
                 # TEST MODE: Connect directly to /twilio endpoint (bypasses reminder logic)
                 print("🧪 TEST MODE: Connecting to /twilio endpoint directly")
